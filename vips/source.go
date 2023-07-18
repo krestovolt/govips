@@ -74,7 +74,7 @@ func (s *Source) free() {
 }
 
 //export goSourceRead
-func goSourceRead(cImageID C.int, buffer unsafe.Pointer, bufSize C.longlong) (read C.longlong) {
+func goSourceRead(cImageID C.int, buffer unsafe.Pointer, bufSize C.gint64) (read C.gint64) {
 	imageID := int(cImageID)
 	sourceMu.RLock()
 	src, ok := sources[imageID]
@@ -95,18 +95,18 @@ func goSourceRead(cImageID C.int, buffer unsafe.Pointer, bufSize C.longlong) (re
 	n, err := src.reader.Read(buf)
 	if errors.Is(err, io.EOF) {
 		govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %d]: EOF [read %d]", imageID, n))
-		return C.longlong(n)
+		return C.gint64(n)
 	} else if err != nil {
 		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceRead[id %d]: Error: %v [read %d]", imageID, err, n))
 		return -1
 	}
 
 	govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %d]: OK [read %d]", imageID, n))
-	return C.longlong(n)
+	return C.gint64(n)
 }
 
 //export goSourceSeek
-func goSourceSeek(cImageID C.int, offset C.longlong, cWhence C.int) (newOffset C.longlong) {
+func goSourceSeek(cImageID C.int, offset C.gint64, cWhence C.int) (newOffset C.gint64) {
 	imageID := int(cImageID)
 	sourceMu.RLock()
 	src, ok := sources[imageID]
@@ -137,5 +137,5 @@ func goSourceSeek(cImageID C.int, offset C.longlong, cWhence C.int) (newOffset C
 
 	govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceSeek[id %d]: OK [seek %d | whence %d]", imageID, n, whence))
 
-	return C.longlong(n)
+	return C.gint64(n)
 }

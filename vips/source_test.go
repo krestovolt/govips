@@ -29,14 +29,7 @@ func Test_VipsCustomSource__JPEG(t *testing.T) {
 
 	imgRef.Thumbnail(320, 85, InterestingNone)
 
-	buf, mt, err := imgRef.Export(&ExportParams{
-		Format:      ImageTypeJPEG, // defaults to the starting encoder
-		Quality:     60,
-		Compression: 7,
-		Interlaced:  true,
-		Lossless:    false,
-		Effort:      6,
-	})
+	buf, mt, err := imgRef.ExportNative()
 
 	fmt.Printf(">>>> w=%d h=%d b=%d \n", imgRef.Width(), imgRef.Height(), reader.Buffered())
 	fmt.Printf(">>>> %v %v %v\n", imgRef, len(buf), mt.Format.FileExt())
@@ -56,14 +49,7 @@ func Benchmark_VipsCustomSource__JPEG(b *testing.B) {
 		imgRef, _ := NewImageFromReader(reader)
 
 		imgRef.Thumbnail(320, 85, InterestingNone)
-		buf, mt, err := imgRef.Export(&ExportParams{
-			Format:      ImageTypeJPEG, // defaults to the starting encoder
-			Quality:     60,
-			Compression: 7,
-			Interlaced:  true,
-			Lossless:    false,
-			Effort:      6,
-		})
+		buf, mt, err := imgRef.ExportNative()
 		if len(buf) == 0 || mt == nil || err != nil {
 		}
 

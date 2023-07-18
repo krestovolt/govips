@@ -13,6 +13,9 @@ import (
 )
 
 var (
+	// FIXME: need to find a way to handle this properly,
+	// maybe the `sources` will grow indefinitely if this is used in long-lived
+	// process?
 	sourceCtr int
 	sources   = make(map[int]*Source)
 	sourceMu  = sync.RWMutex{}

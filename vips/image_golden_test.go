@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -953,20 +954,28 @@ func goldenTest(
 
 	Startup(nil)
 
-	fileSrc, err := os.Open(path)
-	require.NoError(t, err)
-	reader := bufio.NewReader(fileSrc)
-
 	imgFile, err := NewImageFromFile(path)
 	require.NoError(t, err)
 
-	// VipsCustomSource
-	imgReader, err := NewImageFromReader(reader)
-	require.NoError(t, err)
+	imgRefs := []*ImageRef{imgFile}
+
+	// FIXME need a cleaner way to handle BMP image to prevent segvault
+	// bitmap is currently not supported (I assume)
+	// https://github.com/libvips/libvips/issues/3405#issuecomment-1483778760
+	if filepath.Ext(path) != ImageTypeBMP.FileExt() {
+		fileSrc, err := os.Open(path)
+		require.NoError(t, err)
+		reader := bufio.NewReader(fileSrc)
+
+		// VipsCustomSource
+		imgReader, err := NewImageFromReader(reader)
+		require.NoError(t, err)
+		require.NotEmpty(t, imgReader)
+
+		imgRefs = append(imgRefs, imgReader)
+	}
 
 	var returnBuf []byte
-
-	imgRefs := []*ImageRef{imgFile, imgReader}
 	for i, imgRef := range imgRefs {
 		err = exec(imgRef)
 		require.NoError(t, err)

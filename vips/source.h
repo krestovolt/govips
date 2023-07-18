@@ -1,5 +1,8 @@
 #include <vips/vips.h>
 
+extern gint64 goSourceRead(int image_id, void *buffer, gint64 length);
+extern gint64 goSourceSeek(int image_id, gint64 offset, int whence);
+
 typedef struct _GoSourceArguments {
 	int image_id;
 } GoSourceArguments;

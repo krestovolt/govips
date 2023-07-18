@@ -50,14 +50,18 @@ func NewSource(image io.Reader) *Source {
 	return src
 }
 
+func (s *Source) Close() {
+	s.free()
+}
+
 // TODO: FIXME: Needs to be called.
 func (s *Source) free() {
 	C.free(unsafe.Pointer(s.args))
 }
 
-
 //export goSourceRead
-func goSourceRead(imageID int, buffer unsafe.Pointer, bufSize C.longlong) (read C.longlong) {
+func goSourceRead(cImageID C.int, buffer unsafe.Pointer, bufSize C.longlong) (read C.longlong) {
+	imageID := int(cImageID)
 	sourceMu.RLock()
 	src, ok := sources[imageID]
 	sourceMu.RUnlock()
@@ -88,7 +92,8 @@ func goSourceRead(imageID int, buffer unsafe.Pointer, bufSize C.longlong) (read 
 }
 
 //export goSourceSeek
-func goSourceSeek(imageID int, offset C.longlong, whence int) (newOffset C.longlong) {
+func goSourceSeek(cImageID C.int, offset C.longlong, cWhence C.int) (newOffset C.longlong) {
+	imageID := int(cImageID)
 	sourceMu.RLock()
 	src, ok := sources[imageID]
 	sourceMu.RUnlock()
@@ -102,6 +107,7 @@ func goSourceSeek(imageID int, offset C.longlong, whence int) (newOffset C.longl
 		return -1 // Unsupported!
 	}
 
+	whence := int(cWhence)
 	switch whence {
 	case io.SeekStart, io.SeekCurrent, io.SeekEnd:
 	default:

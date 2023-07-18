@@ -21,8 +21,12 @@ var (
 type Source struct {
 	reader io.Reader
 	seeker io.Seeker
-	src    *C.struct__VipsSourceCustom
 	args   *C.struct__GoSourceArguments
+	src    *C.struct__VipsSourceCustom
+	// read signal handler id
+	rsigHandle C.gulong
+	// seek signal handler id
+	ssigHandle C.gulong
 }
 
 // NewSource creates a new image source that uses a regular io.Reader
@@ -46,17 +50,24 @@ func NewSource(image io.Reader) *Source {
 
 	src.args = C.create_go_source_arguments(C.int(id))
 	src.src = C.create_go_custom_source(src.args)
+	src.rsigHandle = C.connect_go_signal_read(src.src, src.args)
+	src.ssigHandle = C.connect_go_signal_seek(src.src, src.args)
 
 	return src
 }
 
 func (s *Source) Close() {
+	imageID := int(s.args.image_id)
+	govipsLog("govips", LogLevelDebug, fmt.Sprintf("Closing source %d", imageID))
+
+	sourceMu.Lock()
+	sources[imageID] = nil
 	s.free()
+	sourceMu.Unlock()
 }
 
-// TODO: FIXME: Needs to be called.
 func (s *Source) free() {
-	C.free(unsafe.Pointer(s.args))
+	C.free_go_custom_source(s.src, s.args, s.rsigHandle, s.ssigHandle)
 }
 
 //export goSourceRead

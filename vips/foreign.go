@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"math"
 	"runtime"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/image/bmp"
@@ -116,6 +117,12 @@ const (
 	PngFilterAll   PngFilter = C.VIPS_FOREIGN_PNG_FILTER_ALL
 )
 
+const (
+	HEIF_META_COMPRESSION = "heif-compression"
+	HEIF_COMPRESSION_HEIC = "hevc"
+	HEIF_COMPRESSION_AVIF = "av1"
+)
+
 // FileExt returns the canonical extension for the ImageType
 func (i ImageType) FileExt() string {
 	if ext, ok := imageTypeExtensionMap[i]; ok {
@@ -129,6 +136,46 @@ func IsTypeSupported(imageType ImageType) bool {
 	startupIfNeeded()
 
 	return supportedImageTypes[imageType]
+}
+
+func determinePartialImageType(img *C.VipsImage) ImageType {
+	loaderMeta, _ := vipsImageGetMetaLoader(img)
+	loaderMeta = strings.ToLower(loaderMeta)
+	switch loaderMeta {
+	case "gifload_source":
+		return ImageTypeGIF
+	case "heifload_source":
+		compression := vipsImageGetString(img, HEIF_META_COMPRESSION)
+		compression = strings.ToLower(compression)
+		switch compression {
+		case HEIF_COMPRESSION_HEIC:
+			// heif-compression == hevc -> ImageTypeHEIF
+			return ImageTypeHEIF
+		case HEIF_COMPRESSION_AVIF:
+			// heif-compression == av1  -> ImageTypeAvif
+			return ImageTypeAVIF
+		}
+		return ImageTypeUnknown
+	case "jp2kload_source":
+		return ImageTypeJP2K
+	// case "jxlload_source":
+	case "jpegload_source":
+		return ImageTypeJPEG
+	case "pdfload_source":
+		return ImageTypePDF
+	case "pngload_source":
+		return ImageTypePNG
+	case "svgload_source":
+		return ImageTypeSVG
+	case "tiffload_source":
+		return ImageTypeTIFF
+	case "webpload_source":
+		return ImageTypeWEBP
+	}
+	// ImageTypeMagick // doesn't have source loader
+	govipsLog("govips", LogLevelWarning, fmt.Sprintf("loader %s is not supported", loaderMeta))
+
+	return ImageTypeUnknown
 }
 
 // DetermineImageType attempts to determine the image type of the given buffer
@@ -252,12 +299,14 @@ func isJP2K(buf []byte) bool {
 	return bytes.HasPrefix(buf, jp2kHeader)
 }
 
-func vipsLoadSource(src *Source) (*C.VipsImage, error) {
+func vipsLoadSource(src *Source) (*C.VipsImage, ImageType, error) {
 	img := C.load_image_source(src.src)
 	if img == nil {
-		return nil, fmt.Errorf("error loading image from source")
+		return nil, ImageTypeUnknown, fmt.Errorf("error loading image from source")
 	}
-	return img, nil
+
+	format := determinePartialImageType(img)
+	return img, format, nil
 }
 
 func vipsLoadFromBuffer(buf []byte, params *ImportParams) (*C.VipsImage, ImageType, ImageType, error) {

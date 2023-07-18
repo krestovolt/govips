@@ -389,14 +389,15 @@ func NewJp2kExportParams() *Jp2kExportParams {
 // NewImageFromReader loads an ImageRef from the given reader
 func NewImageFromReader(r io.Reader) (*ImageRef, error) {
 	src := NewSource(r)
-	img, err := vipsLoadSource(src)
+
+	img, format, err := vipsLoadSource(src)
 	if err != nil {
 		return nil, err
 	}
-	return &ImageRef{
-		image: img,
-		src:   src,
-	}, nil
+
+	ref := newImageRefFromSource(src, img, format)
+
+	return ref, nil
 }
 
 // NewImageFromFile loads an image from file and creates a new ImageRef
@@ -561,6 +562,18 @@ func newImageRef(vipsImage *C.VipsImage, currentFormat ImageType, originalFormat
 		format:         currentFormat,
 		originalFormat: originalFormat,
 		buf:            buf,
+	}
+	runtime.SetFinalizer(imageRef, finalizeImage)
+
+	return imageRef
+}
+
+func newImageRefFromSource(src *Source, vipsImage *C.VipsImage, format ImageType) *ImageRef {
+	imageRef := &ImageRef{
+		image:          vipsImage,
+		format:         format,
+		originalFormat: format,
+		src:            src,
 	}
 	runtime.SetFinalizer(imageRef, finalizeImage)
 

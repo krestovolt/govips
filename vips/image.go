@@ -33,6 +33,7 @@ type ImageRef struct {
 	lock                sync.Mutex
 	preMultiplication   *PreMultiplicationState
 	optimizedIccProfile string
+	src                 *Source
 }
 
 // ImageMetadata is a data structure holding the width, height, orientation and other metadata of the picture.
@@ -375,6 +376,7 @@ func NewImageFromReader(r io.Reader) (*ImageRef, error) {
 	}
 	return &ImageRef{
 		image: img,
+		src:   src,
 	}, nil
 }
 
@@ -537,6 +539,11 @@ func (r *ImageRef) Close() {
 	}
 
 	r.buf = nil
+
+	if r.src != nil {
+		r.src.Close()
+		r.src = nil
+	}
 
 	r.lock.Unlock()
 }

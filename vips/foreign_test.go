@@ -1,9 +1,10 @@
 package vips
 
 import (
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_DetermineImageType__JPEG(t *testing.T) {
@@ -114,4 +115,26 @@ func Test_DetermineImageType__BMP(t *testing.T) {
 
 	imageType := DetermineImageType(buf)
 	assert.Equal(t, ImageTypeBMP, imageType)
+}
+
+func Test_DetermineImageType__AVIF(t *testing.T) {
+	Startup(&Config{})
+
+	buf, err := ioutil.ReadFile(resources + "avif.avif")
+	assert.NoError(t, err)
+	assert.NotNil(t, buf)
+
+	imageType := DetermineImageType(buf)
+	assert.Equal(t, ImageTypeAVIF, imageType)
+}
+
+func Test_DetermineImageType__JP2K(t *testing.T) {
+	Startup(&Config{})
+
+	buf, err := ioutil.ReadFile(resources + "jp2k-orientation-6.jp2")
+	assert.NoError(t, err)
+	assert.NotNil(t, buf)
+
+	imageType := DetermineImageType(buf)
+	assert.Equal(t, ImageTypeJP2K, imageType)
 }

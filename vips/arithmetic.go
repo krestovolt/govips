@@ -1,8 +1,8 @@
 package vips
 
-// #cgo pkg-config: vips
 // #include "arithmetic.h"
 import "C"
+import "unsafe"
 
 // https://libvips.github.io/libvips/API/current/libvips-arithmetic.html#vips-add
 func vipsAdd(left *C.VipsImage, right *C.VipsImage) (*C.VipsImage, error) {
@@ -22,6 +22,18 @@ func vipsMultiply(left *C.VipsImage, right *C.VipsImage) (*C.VipsImage, error) {
 	var out *C.VipsImage
 
 	if err := C.multiply(left, right, &out); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+// https://libvips.github.io/libvips/API/current/libvips-arithmetic.html#vips-divide
+func vipsDivide(left *C.VipsImage, right *C.VipsImage) (*C.VipsImage, error) {
+	incOpCounter("divide")
+	var out *C.VipsImage
+
+	if err := C.divide(left, right, &out); err != 0 {
 		return nil, handleImageError(out)
 	}
 
@@ -62,4 +74,43 @@ func vipsInvert(in *C.VipsImage) (*C.VipsImage, error) {
 	}
 
 	return out, nil
+}
+
+// https://libvips.github.io/libvips/API/current/libvips-arithmetic.html#vips-avg
+func vipsAverage(in *C.VipsImage) (float64, error) {
+	incOpCounter("average")
+	var out C.double
+
+	if err := C.average(in, &out); err != 0 {
+		return 0, handleVipsError()
+	}
+
+	return float64(out), nil
+}
+
+// https://libvips.github.io/libvips/API/current/libvips-arithmetic.html#vips-find-trim
+func vipsFindTrim(in *C.VipsImage, threshold float64, backgroundColor *Color) (int, int, int, int, error) {
+	incOpCounter("findTrim")
+	var left, top, width, height C.int
+
+	if err := C.find_trim(in, &left, &top, &width, &height, C.double(threshold), C.double(backgroundColor.R),
+		C.double(backgroundColor.G), C.double(backgroundColor.B)); err != 0 {
+		return -1, -1, -1, -1, handleVipsError()
+	}
+
+	return int(left), int(top), int(width), int(height), nil
+}
+
+// https://libvips.github.io/libvips/API/current/libvips-arithmetic.html#vips-getpoint
+func vipsGetPoint(in *C.VipsImage, n int, x int, y int) ([]float64, error) {
+	incOpCounter("getpoint")
+	var out *C.double
+	defer gFreePointer(unsafe.Pointer(out))
+
+	if err := C.getpoint(in, &out, C.int(n), C.int(x), C.int(y)); err != 0 {
+		return nil, handleVipsError()
+	}
+
+	// maximum n is 4
+	return (*[4]float64)(unsafe.Pointer(out))[:n:n], nil
 }

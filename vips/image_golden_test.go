@@ -1,6 +1,11 @@
 package vips
 
 import (
+	"bufio"
+	"bytes"
+	"image"
+	jpeg2 "image/jpeg"
+	"image/png"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -8,9 +13,20 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/image/bmp"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestImage_PNG_64bit_OptimizeICCProfile(t *testing.T) {
+	goldenTest(t, resources+"png-alpha-64bit.png",
+		func(img *ImageRef) error {
+			return img.OptimizeICCProfile()
+		},
+		nil,
+		exportPng(NewPngExportParams()))
+}
 
 func TestImage_Resize_Downscale(t *testing.T) {
 	goldenTest(t, resources+"jpg-24bit.jpg",
@@ -46,6 +62,70 @@ func TestImage_Resize_Upscale_Alpha(t *testing.T) {
 	}, nil, nil)
 }
 
+func TestImage_Embed_ExtendWhite_Alpha(t *testing.T) {
+	goldenTest(t, resources+"png-8bit+alpha.png", func(img *ImageRef) error {
+		return img.Embed(0, 0, 1000, 500, ExtendWhite)
+	}, func(img *ImageRef) {
+		point, err := img.GetPoint(999, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, point, []float64{255, 255, 255, 255})
+	}, nil)
+}
+
+func TestImage_EmbedBackgroundRGBA_Alpha(t *testing.T) {
+	goldenTest(t, resources+"png-8bit+alpha.png", func(img *ImageRef) error {
+		return img.EmbedBackgroundRGBA(0, 0, 1000, 500, &ColorRGBA{R: 238, G: 238, B: 238, A: 50})
+	}, func(img *ImageRef) {
+		point, err := img.GetPoint(999, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, point, []float64{238, 238, 238, 50})
+	}, nil)
+}
+
+func TestImage_EmbedBackground_Alpha(t *testing.T) {
+	goldenTest(t, resources+"png-8bit+alpha.png", func(img *ImageRef) error {
+		return img.EmbedBackground(0, 0, 1000, 500, &Color{R: 238, G: 238, B: 238})
+	}, func(img *ImageRef) {
+		point, err := img.GetPoint(999, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, point, []float64{238, 238, 238, 255})
+	}, nil)
+}
+
+func TestImage_EmbedBackground_NoAlpha(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg",
+		func(img *ImageRef) error {
+			return img.EmbedBackground(0, 0, 500, 300, &Color{R: 238, G: 238, B: 238})
+		},
+		func(result *ImageRef) {
+			point, err := result.GetPoint(499, 0)
+			assert.NoError(t, err)
+			assert.Equal(t, point, []float64{238, 238, 238})
+		}, nil)
+}
+
+func TestImage_TransformICCProfile_RGB_No_Profile(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg",
+		func(img *ImageRef) error {
+			return img.TransformICCProfile(SRGBIEC6196621ICCProfilePath)
+		},
+		func(result *ImageRef) {
+			assert.True(t, result.HasICCProfile())
+			assert.Equal(t, InterpretationSRGB, result.Interpretation())
+		}, nil)
+}
+
+func TestImage_TransformICCProfile_RGB_Embedded(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-adobe-rgb.jpg",
+		func(img *ImageRef) error {
+			return img.TransformICCProfile(SRGBIEC6196621ICCProfilePath)
+		},
+		func(result *ImageRef) {
+			assert.True(t, result.HasICCProfile())
+			assert.Equal(t, InterpretationSRGB, result.Interpretation())
+		}, nil)
+}
+
 func TestImage_OptimizeICCProfile_CMYK(t *testing.T) {
 	goldenTest(t, resources+"jpg-32bit-cmyk-icc-swop.jpg",
 		func(img *ImageRef) error {
@@ -79,6 +159,14 @@ func TestImage_OptimizeICCProfile_RGB_Embedded(t *testing.T) {
 		}, nil)
 }
 
+func TestImageRef_PngToWebp_OptimizeICCProfile_Lossless(t *testing.T) {
+	exportParams := NewWebpExportParams()
+	exportParams.Quality = 90
+	exportParams.Lossless = true
+
+	testWebpOptimizeIccProfile(t, exportParams)
+}
+
 func TestImage_OptimizeICCProfile_Grey(t *testing.T) {
 	goldenTest(t, resources+"jpg-8bit-gray-scale-with-icc-profile.jpg",
 		func(img *ImageRef) error {
@@ -93,6 +181,7 @@ func TestImage_OptimizeICCProfile_Grey(t *testing.T) {
 func TestImage_RemoveICCProfile(t *testing.T) {
 	goldenTest(t, resources+"jpg-24bit-icc-smpte.jpg",
 		func(img *ImageRef) error {
+			assert.True(t, img.HasICCProfile())
 			return img.RemoveICCProfile()
 		},
 		func(result *ImageRef) {
@@ -100,10 +189,15 @@ func TestImage_RemoveICCProfile(t *testing.T) {
 		}, nil)
 }
 
-func TestImage_RemoveMetadata(t *testing.T) {
-	goldenTest(t, resources+"heic-24bit-exif.heic", func(img *ImageRef) error {
-		return img.RemoveMetadata()
-	}, nil, nil)
+func TestImage_RemoveMetadata_Removes_Exif(t *testing.T) {
+	goldenTest(t, resources+"heic-24bit-exif.heic",
+		func(img *ImageRef) error {
+			assert.True(t, img.HasExif())
+			return img.RemoveMetadata()
+		},
+		func(img *ImageRef) {
+			assert.False(t, img.HasExif())
+		}, nil)
 }
 
 func TestImageRef_RemoveMetadata_Leave_Orientation(t *testing.T) {
@@ -112,7 +206,7 @@ func TestImageRef_RemoveMetadata_Leave_Orientation(t *testing.T) {
 			return img.RemoveMetadata()
 		},
 		func(result *ImageRef) {
-			assert.Equal(t, 5, result.GetOrientation())
+			assert.Equal(t, 5, result.Orientation())
 		}, nil)
 }
 
@@ -122,9 +216,10 @@ func TestImageRef_Orientation_Issue(t *testing.T) {
 			return img.Resize(0.9, KernelLanczos3)
 		},
 		func(result *ImageRef) {
-			assert.Equal(t, 6, result.GetOrientation())
+			assert.Equal(t, 6, result.Orientation())
 		},
-		NewDefaultWEBPExportParams())
+		exportWebp(nil),
+	)
 }
 
 func TestImageRef_RemoveMetadata_Leave_Profile(t *testing.T) {
@@ -133,7 +228,7 @@ func TestImageRef_RemoveMetadata_Leave_Profile(t *testing.T) {
 			return img.RemoveMetadata()
 		},
 		func(result *ImageRef) {
-			assert.True(t, result.HasICCProfile())
+			assert.True(t, result.HasICCProfile(), "should have an ICC profile")
 		}, nil)
 }
 
@@ -143,7 +238,7 @@ func TestImage_AutoRotate_0(t *testing.T) {
 			return img.AutoRotate()
 		},
 		func(result *ImageRef) {
-			assert.Equal(t, 0, result.GetOrientation())
+			assert.Equal(t, 0, result.Orientation())
 		}, nil)
 }
 
@@ -153,7 +248,7 @@ func TestImage_AutoRotate_1(t *testing.T) {
 			return img.AutoRotate()
 		},
 		func(result *ImageRef) {
-			assert.Equal(t, 1, result.GetOrientation())
+			assert.Equal(t, 1, result.Orientation())
 		}, nil)
 }
 
@@ -163,7 +258,7 @@ func TestImage_AutoRotate_5(t *testing.T) {
 			return img.AutoRotate()
 		},
 		func(result *ImageRef) {
-			assert.Equal(t, 1, result.GetOrientation())
+			assert.Equal(t, 1, result.Orientation())
 		}, nil)
 }
 
@@ -173,7 +268,7 @@ func TestImage_AutoRotate_6(t *testing.T) {
 			return img.AutoRotate()
 		},
 		func(result *ImageRef) {
-			assert.Equal(t, 1, result.GetOrientation())
+			assert.Equal(t, 1, result.Orientation())
 		}, nil)
 }
 
@@ -186,8 +281,10 @@ func TestImage_AutoRotate_6__jpeg_to_webp(t *testing.T) {
 			// expected should be 1
 			// Known issue: libvips does not write EXIF into WebP:
 			// https://github.com/libvips/libvips/pull/1745
-			//assert.Equal(t, 0, result.GetOrientation())
-		}, NewDefaultWEBPExportParams())
+			//assert.Equal(t, 0, result.Orientation())
+		},
+		exportWebp(nil),
+	)
 }
 
 func TestImage_AutoRotate_6__heic_to_jpg(t *testing.T) {
@@ -196,8 +293,9 @@ func TestImage_AutoRotate_6__heic_to_jpg(t *testing.T) {
 			return img.AutoRotate()
 		},
 		func(result *ImageRef) {
-			assert.Equal(t, 1, result.GetOrientation())
-		}, NewDefaultJPEGExportParams())
+			assert.Equal(t, 1, result.Orientation())
+		}, exportJpeg(nil),
+	)
 }
 
 func TestImage_Sharpen_24bit_Alpha(t *testing.T) {
@@ -302,6 +400,17 @@ func TestImage_Thumbnail_NoCrop(t *testing.T) {
 		}, nil)
 }
 
+func TestImage_Thumbnail_NoUpscale(t *testing.T) {
+	goldenTest(t, resources+"jpg-8bit-grey-icc-dot-gain.jpg",
+		func(img *ImageRef) error {
+			return img.ThumbnailWithSize(9999, 9999, InterestingNone, SizeDown)
+		},
+		func(result *ImageRef) {
+			assert.Equal(t, 715, result.Width())
+			assert.Equal(t, 483, result.Height())
+		}, nil)
+}
+
 func TestImage_Thumbnail_CropCentered(t *testing.T) {
 	goldenTest(t, resources+"jpg-8bit-grey-icc-dot-gain.jpg",
 		func(img *ImageRef) error {
@@ -324,9 +433,250 @@ func TestImage_ResizeWithVScale(t *testing.T) {
 		}, nil)
 }
 
+func TestImage_Add(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg",
+		func(img *ImageRef) error {
+			addend, err := NewImageFromFile(resources + "heic-24bit.heic")
+			require.NoError(t, err)
+
+			return img.Add(addend)
+		},
+		func(result *ImageRef) {
+			assert.Equal(t, 1440, result.Width())
+			assert.Equal(t, 960, result.Height())
+		}, nil)
+}
+
+func TestImage_Multiply(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg",
+		func(img *ImageRef) error {
+			multiplier, err := NewImageFromFile(resources + "heic-24bit.heic")
+			require.NoError(t, err)
+
+			return img.Multiply(multiplier)
+		},
+		func(result *ImageRef) {
+			assert.Equal(t, 1440, result.Width())
+			assert.Equal(t, 960, result.Height())
+		}, nil)
+}
+
+func TestImageRef_Divide(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg",
+		func(img *ImageRef) error {
+			denominator, err := NewImageFromFile(resources + "heic-24bit.heic")
+			require.NoError(t, err)
+
+			return img.Divide(denominator)
+		},
+		func(result *ImageRef) {
+			assert.Equal(t, 1440, result.Width())
+			assert.Equal(t, 960, result.Height())
+		}, nil)
+}
+
 func TestImage_GaussianBlur(t *testing.T) {
 	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
 		return img.GaussianBlur(10.5)
+	}, nil, nil)
+}
+
+func TestImage_BandJoinConst(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		return img.BandJoinConst([]float64{255})
+	}, nil, nil)
+}
+
+func TestImage_SmartCrop(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		return img.SmartCrop(60, 80, InterestingCentre)
+	}, func(result *ImageRef) {
+		assert.Equal(t, 60, result.Width())
+		assert.Equal(t, 80, result.Height())
+	}, nil)
+}
+
+func TestImage_Replicate(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		return img.Replicate(3, 2)
+	}, func(result *ImageRef) {
+		assert.Equal(t, 300, result.Width())
+		assert.Equal(t, 200, result.Height())
+	}, nil)
+}
+
+func TestImage_DrawRect(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		return img.DrawRect(ColorRGBA{
+			R: 255,
+			G: 255,
+			B: 0,
+			A: 0,
+		}, 20, 20, img.Width()-40, img.Height()-40, true)
+	}, nil, nil)
+}
+
+func TestImage_DrawRectRGBA(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		err := img.AddAlpha()
+		assert.Nil(t, err)
+		return img.DrawRect(ColorRGBA{
+			R: 255,
+			G: 255,
+			B: 0,
+			A: 255,
+		}, 20, 20, img.Width()-40, img.Height()-40, false)
+	}, nil, nil)
+}
+
+func TestImage_Rank(t *testing.T) {
+	goldenTest(t, resources+"png-24bit.png", func(img *ImageRef) error {
+		return img.Rank(15, 15, 224)
+	}, nil, nil)
+}
+
+func TestImage_GetPointWhite(t *testing.T) {
+	goldenTest(t, resources+"png-24bit.png", func(img *ImageRef) error {
+		point, err := img.GetPoint(10, 10)
+
+		assert.Equal(t, 3, len(point))
+		assert.Equal(t, 255.0, point[0])
+		assert.Equal(t, 255.0, point[1])
+		assert.Equal(t, 255.0, point[2])
+
+		return err
+	}, nil, nil)
+}
+
+func TestImage_GetPointYellow(t *testing.T) {
+	goldenTest(t, resources+"png-24bit.png", func(img *ImageRef) error {
+		point, err := img.GetPoint(400, 10)
+
+		assert.Equal(t, 3, len(point))
+		assert.Equal(t, 255.0, point[0])
+		assert.Equal(t, 255.0, point[1])
+		assert.Equal(t, 0.0, point[2])
+
+		return err
+	}, nil, nil)
+}
+
+func TestImage_GetPointWhiteR(t *testing.T) {
+	goldenTest(t, resources+"png-24bit.png", func(img *ImageRef) error {
+		point, err := img.GetPoint(10, 10)
+
+		assert.Equal(t, 3, len(point))
+		assert.Equal(t, 255.0, point[0])
+		assert.Equal(t, 255.0, point[1])
+		assert.Equal(t, 255.0, point[2])
+
+		return err
+	}, nil, nil)
+}
+
+func TestImage_GetPoint_WithAlpha(t *testing.T) {
+	goldenTest(t, resources+"with_alpha.png", func(img *ImageRef) error {
+		point, err := img.GetPoint(10, 10)
+
+		assert.Equal(t, 4, len(point))
+		assert.Equal(t, 0.0, point[0])
+		assert.Equal(t, 0.0, point[1])
+		assert.Equal(t, 0.0, point[2])
+		assert.Equal(t, 255.0, point[3])
+
+		return err
+	}, nil, nil)
+}
+
+func TestImage_GetPoint_WithAlpha2(t *testing.T) {
+	goldenTest(t, resources+"with_alpha.png", func(img *ImageRef) error {
+		point, err := img.GetPoint(0, 0)
+
+		assert.Equal(t, 4, len(point))
+		assert.Equal(t, 0.0, point[0])
+		assert.Equal(t, 0.0, point[1])
+		assert.Equal(t, 0.0, point[2])
+		assert.Equal(t, 0.0, point[3])
+
+		return err
+	}, nil, nil)
+}
+
+func TestImage_SimilarityRGB(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		return img.Similarity(0.5, 5, &ColorRGBA{R: 127, G: 127, B: 127, A: 127},
+			10, 10, 20, 20)
+	}, func(result *ImageRef) {
+		assert.Equal(t, 3, result.Bands())
+	}, nil)
+}
+
+func TestImage_SimilarityRGBA(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		err := img.AddAlpha()
+		assert.Nil(t, err)
+		err = img.Similarity(0.5, 5, &ColorRGBA{R: 127, G: 127, B: 127, A: 127},
+			10, 10, 20, 20)
+		assert.Nil(t, err)
+		assert.Equal(t, 4, img.Bands())
+		return nil
+	}, nil, nil)
+}
+
+func TestImage_Decode_JPG(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		goImg, err := img.ToImage(nil)
+		assert.NoError(t, err)
+
+		buf := new(bytes.Buffer)
+		err = jpeg2.Encode(buf, goImg, nil)
+		assert.Nil(t, err)
+
+		config, format, err := image.DecodeConfig(buf)
+		assert.Nil(t, err)
+		assert.Equal(t, "jpeg", format)
+		assert.NotNil(t, config)
+		assert.True(t, config.Height > 0)
+		assert.True(t, config.Width > 0)
+		return nil
+	}, nil, nil)
+}
+
+func TestImage_Decode_BMP(t *testing.T) {
+	goldenTest(t, resources+"bmp.bmp", func(img *ImageRef) error {
+		goImg, err := img.ToImage(nil)
+		assert.NoError(t, err)
+
+		buf := new(bytes.Buffer)
+		err = bmp.Encode(buf, goImg)
+		assert.Nil(t, err)
+
+		config, format, err := image.DecodeConfig(buf)
+		assert.Nil(t, err)
+		assert.Equal(t, "bmp", format)
+		assert.NotNil(t, config)
+		assert.True(t, config.Height > 0)
+		assert.True(t, config.Width > 0)
+		return nil
+	}, nil, nil)
+}
+
+func TestImage_Decode_PNG(t *testing.T) {
+	goldenTest(t, resources+"png-8bit.png", func(img *ImageRef) error {
+		goImg, err := img.ToImage(nil)
+		assert.NoError(t, err)
+
+		buf := new(bytes.Buffer)
+		err = png.Encode(buf, goImg)
+		assert.Nil(t, err)
+
+		config, format, err := image.DecodeConfig(buf)
+		assert.Nil(t, err)
+		assert.Equal(t, "png", format)
+		assert.NotNil(t, config)
+		assert.Equal(t, 150, config.Height)
+		assert.Equal(t, 200, config.Width)
+		return nil
 	}, nil, nil)
 }
 
@@ -342,50 +692,287 @@ func TestImage_Flip(t *testing.T) {
 	}, nil, nil)
 }
 
-// TODO Add unit tests for:
-// Embed
-// Zoom
+func TestImage_Embed(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit.jpg", func(img *ImageRef) error {
+		return img.Embed(10, 10, 20, 20, ExtendBlack)
+	}, nil, nil)
+}
 
-func goldenTest(t *testing.T, file string, exec func(img *ImageRef) error, validate func(img *ImageRef), params *ExportParams) []byte {
+func TestImage_ExtractBand(t *testing.T) {
+	goldenTest(t, resources+"with_alpha.png", func(img *ImageRef) error {
+		return img.ExtractBand(2, 1)
+	}, nil, nil)
+}
+
+func TestImage_Flatten(t *testing.T) {
+	goldenTest(t, resources+"with_alpha.png", func(img *ImageRef) error {
+		return img.Flatten(&Color{R: 32, G: 64, B: 128})
+	}, nil, nil)
+}
+
+func TestImage_Tiff(t *testing.T) {
+	goldenTest(t, resources+"tif.tif", func(img *ImageRef) error {
+		return img.OptimizeICCProfile()
+	}, nil, nil)
+}
+
+func TestImage_Black(t *testing.T) {
+	Startup(nil)
+	i, err := Black(10, 20)
+	require.NoError(t, err)
+	buf, metadata, err := i.ExportNative()
+	require.NoError(t, err)
+
+	assertGoldenMatch(t, resources+"jpg-24bit.jpg", buf, metadata.Format)
+}
+
+// vips jpegsave resources/jpg-24bit-icc-iec.jpg test.jpg --Q=75 --profile=none --strip --subsample-mode=auto --interlace --optimize-coding
+func TestImage_OptimizeCoding(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-iec.jpg",
+		nil,
+		nil,
+		exportJpeg(&JpegExportParams{
+			SubsampleMode:  VipsForeignSubsampleAuto,
+			StripMetadata:  true,
+			Quality:        75,
+			Interlace:      true,
+			OptimizeCoding: true,
+		}),
+	)
+}
+
+// vips jpegsave resources/jpg-24bit-icc-iec.jpg test.jpg --Q=75 --profile=none --strip --subsample-mode=on
+func TestImage_SubsampleMode(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-iec.jpg",
+		nil,
+		nil,
+		exportJpeg(&JpegExportParams{
+			SubsampleMode: VipsForeignSubsampleOn,
+			StripMetadata: true,
+			Quality:       75,
+		}),
+	)
+}
+
+// vips jpegsave resources/jpg-24bit-icc-iec.jpg test.jpg --Q=75 --profile=none --strip --trellis-quant
+func TestImage_TrellisQuant(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-iec.jpg",
+		nil,
+		nil,
+		exportJpeg(&JpegExportParams{
+			SubsampleMode: VipsForeignSubsampleAuto,
+			StripMetadata: true,
+			Quality:       75,
+			TrellisQuant:  true,
+		}),
+	)
+}
+
+// vips jpegsave resources/jpg-24bit-icc-iec.jpg test.jpg --Q=75 --profile=none --strip --overshoot-deringing
+func TestImage_OvershootDeringing(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-iec.jpg",
+		nil,
+		nil,
+		exportJpeg(&JpegExportParams{
+			SubsampleMode:      VipsForeignSubsampleAuto,
+			StripMetadata:      true,
+			Quality:            75,
+			OvershootDeringing: true,
+		}),
+	)
+}
+
+// vips jpegsave resources/jpg-24bit-icc-iec.jpg test.jpg --Q=75 --profile=none --strip --interlace --optimize-scans
+func TestImage_OptimizeScans(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-iec.jpg",
+		nil,
+		nil,
+		exportJpeg(&JpegExportParams{
+			SubsampleMode: VipsForeignSubsampleAuto,
+			StripMetadata: true,
+			Quality:       75,
+			Interlace:     true,
+			OptimizeScans: true,
+		}),
+	)
+}
+
+// vips jpegsave resources/jpg-24bit-icc-iec.jpg test.jpg --Q=75 --profile=none --strip --quant-table=3
+func TestImage_QuantTable(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-iec.jpg",
+		nil,
+		nil,
+		exportJpeg(&JpegExportParams{
+			SubsampleMode: VipsForeignSubsampleAuto,
+			StripMetadata: true,
+			Quality:       75,
+			QuantTable:    3,
+		}),
+	)
+}
+
+func TestImage_Pixelate(t *testing.T) {
+	goldenTest(t, resources+"jpg-24bit-icc-iec.jpg",
+		func(img *ImageRef) error {
+			return Pixelate(img, 24)
+		},
+		nil, nil)
+}
+
+func testWebpOptimizeIccProfile(t *testing.T, exportParams *WebpExportParams) []byte {
+	return goldenTest(t, resources+"has-icc-profile.png",
+		func(img *ImageRef) error {
+			return img.OptimizeICCProfile()
+		},
+		func(result *ImageRef) {
+			assert.True(t, result.HasICCProfile(), "should have an ICC profile")
+		},
+		exportWebp(exportParams),
+	)
+}
+
+func exportWebp(exportParams *WebpExportParams) func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+	return func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+		return img.ExportWebp(exportParams)
+	}
+}
+
+func exportJpeg(exportParams *JpegExportParams) func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+	return func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+		return img.ExportJpeg(exportParams)
+	}
+}
+
+func exportPng(exportParams *PngExportParams) func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+	return func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+		return img.ExportPng(exportParams)
+	}
+}
+
+func exportGif(exportParams *GifExportParams) func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+	return func(img *ImageRef) ([]byte, *ImageMetadata, error) {
+		return img.ExportGIF(exportParams)
+	}
+}
+
+func goldenTest(
+	t *testing.T,
+	path string,
+	exec func(img *ImageRef) error,
+	validate func(img *ImageRef),
+	export func(img *ImageRef) ([]byte, *ImageMetadata, error),
+) []byte {
+	if exec == nil {
+		exec = func(*ImageRef) error { return nil }
+	}
+
+	if validate == nil {
+		validate = func(*ImageRef) {}
+	}
+
+	if export == nil {
+		export = func(img *ImageRef) ([]byte, *ImageMetadata, error) { return img.ExportNative() }
+	}
+
 	Startup(nil)
 
-	LoggingSettings(nil, LogLevelDebug)
+	fileSrc, err := os.Open(path)
+	require.NoError(t, err)
+	reader := bufio.NewReader(fileSrc)
 
-	// Test with loading the buffer immediately into memory
-	bufImg, err := NewImageFromFile(file)
+	imgFile, err := NewImageFromFile(path)
 	require.NoError(t, err)
 
-	// Test with using an image source
-	imageFile, err := os.Open(file)
-	require.NoError(t, err)
-
-	readerImg, err := NewImageFromReader(imageFile)
+	// VipsCustomSource
+	imgReader, err := NewImageFromReader(reader)
 	require.NoError(t, err)
 
 	var returnBuf []byte
-	imgRefs := []*ImageRef{bufImg, readerImg}
+
+	imgRefs := []*ImageRef{imgFile, imgReader}
 	for i, imgRef := range imgRefs {
 		err = exec(imgRef)
 		require.NoError(t, err)
 
-		buf, metadata, err := imgRef.Export(params)
+		buf, metadata, err := export(imgRef)
 		require.NoError(t, err)
 
 		if i == 0 {
 			returnBuf = buf
 		}
 
-		if validate != nil {
-			result, err := NewImageFromBuffer(buf)
-			require.NoError(t, err)
+		result, err := NewImageFromBuffer(buf)
+		require.NoError(t, err)
 
-			validate(result)
-		}
+		validate(result)
 
-		assertGoldenMatch(t, file, buf, metadata.Format)
+		assertGoldenMatch(t, path, buf, metadata.Format)
 	}
 
 	return returnBuf
+}
+
+func goldenCreateTest(
+	t *testing.T,
+	path string,
+	createFromFile func(path string) (*ImageRef, error),
+	createFromBuffer func(buf []byte) (*ImageRef, error),
+	exec func(img *ImageRef) error,
+	validate func(img *ImageRef),
+	export func(img *ImageRef) ([]byte, *ImageMetadata, error),
+) []byte {
+	if createFromFile == nil {
+		createFromFile = NewImageFromFile
+	}
+	if exec == nil {
+		exec = func(*ImageRef) error { return nil }
+	}
+
+	if validate == nil {
+		validate = func(*ImageRef) {}
+	}
+
+	if export == nil {
+		export = func(img *ImageRef) ([]byte, *ImageMetadata, error) { return img.ExportNative() }
+	}
+
+	Startup(nil)
+
+	img, err := createFromFile(path)
+	require.NoError(t, err)
+
+	err = exec(img)
+	require.NoError(t, err)
+
+	buf, metadata, err := export(img)
+	require.NoError(t, err)
+
+	result, err := NewImageFromBuffer(buf)
+	require.NoError(t, err)
+
+	validate(result)
+
+	assertGoldenMatch(t, path, buf, metadata.Format)
+
+	buf2, err := ioutil.ReadFile(path)
+	require.NoError(t, err)
+
+	img2, err := createFromBuffer(buf2)
+
+	err = exec(img2)
+	require.NoError(t, err)
+
+	buf2, metadata2, err := export(img2)
+	require.NoError(t, err)
+
+	result2, err := NewImageFromBuffer(buf2)
+	require.NoError(t, err)
+
+	validate(result2)
+
+	assertGoldenMatch(t, path, buf2, metadata2.Format)
+
+	return buf
 }
 
 func getEnvironment() string {
@@ -393,7 +980,12 @@ func getEnvironment() string {
 	case "windows":
 		return "windows"
 	case "darwin":
-		return "macos"
+		out, err := exec.Command("sw_vers", "-productVersion").Output()
+		if err != nil {
+			return "macos-unknown"
+		}
+		majorVersion := strings.Split(strings.TrimSpace(string(out)), ".")[0]
+		return "macos-" + majorVersion
 	case "linux":
 		out, err := exec.Command("lsb_release", "-cs").Output()
 		if err != nil {
@@ -420,7 +1012,8 @@ func assertGoldenMatch(t *testing.T, file string, buf []byte, format ImageType) 
 
 	golden, _ := ioutil.ReadFile(goldenFile)
 	if golden != nil {
-		if !assert.Equal(t, golden, buf) {
+		sameAsGolden := assert.True(t, bytes.Equal(buf, golden), "Actual image (size=%d) didn't match expected golden file=%s (size=%d)", len(buf), goldenFile, len(golden))
+		if !sameAsGolden {
 			failed := prefix + "-" + getEnvironment() + ".failed" + ext
 			err := ioutil.WriteFile(failed, buf, 0666)
 			if err != nil {
@@ -433,4 +1026,48 @@ func assertGoldenMatch(t *testing.T, file string, buf []byte, format ImageType) 
 	t.Log("writing golden file: " + goldenFile)
 	err := ioutil.WriteFile(goldenFile, buf, 0644)
 	assert.NoError(t, err)
+}
+
+func goldenAnimatedTest(
+	t *testing.T,
+	path string,
+	pages int,
+	exec func(img *ImageRef) error,
+	validate func(img *ImageRef),
+	export func(img *ImageRef) ([]byte, *ImageMetadata, error),
+) []byte {
+	if exec == nil {
+		exec = func(*ImageRef) error { return nil }
+	}
+
+	if validate == nil {
+		validate = func(*ImageRef) {}
+	}
+
+	if export == nil {
+		export = func(img *ImageRef) ([]byte, *ImageMetadata, error) { return img.ExportNative() }
+	}
+
+	Startup(nil)
+
+	importParams := NewImportParams()
+	importParams.NumPages.Set(pages)
+
+	img, err := LoadImageFromFile(path, importParams)
+	require.NoError(t, err)
+
+	err = exec(img)
+	require.NoError(t, err)
+
+	buf, metadata, err := export(img)
+	require.NoError(t, err)
+
+	result, err := NewImageFromBuffer(buf)
+	require.NoError(t, err)
+
+	validate(result)
+
+	assertGoldenMatch(t, path, buf, metadata.Format)
+
+	return buf
 }

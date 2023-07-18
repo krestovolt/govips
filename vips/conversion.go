@@ -1,6 +1,5 @@
 package vips
 
-// #cgo pkg-config: vips
 // #include "conversion.h"
 import "C"
 
@@ -136,7 +135,45 @@ func vipsEmbed(in *C.VipsImage, left, top, width, height int, extend ExtendStrat
 	incOpCounter("embed")
 	var out *C.VipsImage
 
-	if err := C.embed_image(in, &out, C.int(left), C.int(top), C.int(width), C.int(height), C.int(extend), 0, 0, 0); err != 0 {
+	if err := C.embed_image(in, &out, C.int(left), C.int(top), C.int(width), C.int(height), C.int(extend)); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+// https://libvips.github.io/libvips/API/current/libvips-conversion.html#vips-embed
+func vipsEmbedBackground(in *C.VipsImage, left, top, width, height int, backgroundColor *ColorRGBA) (*C.VipsImage, error) {
+	incOpCounter("embed")
+	var out *C.VipsImage
+
+	if err := C.embed_image_background(in, &out, C.int(left), C.int(top), C.int(width),
+		C.int(height), C.double(backgroundColor.R),
+		C.double(backgroundColor.G), C.double(backgroundColor.B), C.double(backgroundColor.A)); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+func vipsEmbedMultiPage(in *C.VipsImage, left, top, width, height int, extend ExtendStrategy) (*C.VipsImage, error) {
+	incOpCounter("embedMultiPage")
+	var out *C.VipsImage
+
+	if err := C.embed_multi_page_image(in, &out, C.int(left), C.int(top), C.int(width), C.int(height), C.int(extend)); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+func vipsEmbedMultiPageBackground(in *C.VipsImage, left, top, width, height int, backgroundColor *ColorRGBA) (*C.VipsImage, error) {
+	incOpCounter("embedMultiPageBackground")
+	var out *C.VipsImage
+
+	if err := C.embed_multi_page_image_background(in, &out, C.int(left), C.int(top), C.int(width),
+		C.int(height), C.double(backgroundColor.R),
+		C.double(backgroundColor.G), C.double(backgroundColor.B), C.double(backgroundColor.A)); err != 0 {
 		return nil, handleImageError(out)
 	}
 
@@ -167,12 +204,50 @@ func vipsExtractArea(in *C.VipsImage, left, top, width, height int) (*C.VipsImag
 	return out, nil
 }
 
+func vipsExtractAreaMultiPage(in *C.VipsImage, left, top, width, height int) (*C.VipsImage, error) {
+	incOpCounter("extractAreaMultiPage")
+	var out *C.VipsImage
+
+	if err := C.extract_area_multi_page(in, &out, C.int(left), C.int(top), C.int(width), C.int(height)); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
 // https://libvips.github.io/libvips/API/current/libvips-conversion.html#vips-extract-band
 func vipsExtractBand(in *C.VipsImage, band, num int) (*C.VipsImage, error) {
 	incOpCounter("extractBand")
 	var out *C.VipsImage
 
 	if err := C.extract_band(in, &out, C.int(band), C.int(num)); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+// http://libvips.github.io/libvips/API/current/libvips-resample.html#vips-similarity
+func vipsSimilarity(in *C.VipsImage, scale float64, angle float64, color *ColorRGBA,
+	idx float64, idy float64, odx float64, ody float64) (*C.VipsImage, error) {
+	incOpCounter("similarity")
+	var out *C.VipsImage
+
+	if err := C.similarity(in, &out, C.double(scale), C.double(angle),
+		C.double(color.R), C.double(color.G), C.double(color.B), C.double(color.A),
+		C.double(idx), C.double(idy), C.double(odx), C.double(ody)); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+// http://libvips.github.io/libvips/API/current/libvips-conversion.html#vips-smartcrop
+func vipsSmartCrop(in *C.VipsImage, width int, height int, interesting Interesting) (*C.VipsImage, error) {
+	incOpCounter("smartcrop")
+	var out *C.VipsImage
+
+	if err := C.smartcrop(in, &out, C.int(width), C.int(height), C.int(interesting)); err != 0 {
 		return nil, handleImageError(out)
 	}
 
@@ -221,6 +296,18 @@ func vipsBandJoin(ins []*C.VipsImage) (*C.VipsImage, error) {
 	var out *C.VipsImage
 
 	if err := C.bandjoin(&ins[0], &out, C.int(len(ins))); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+// http://libvips.github.io/libvips/API/current/libvips-conversion.html#vips-bandjoin-const
+func vipsBandJoinConst(in *C.VipsImage, constants []float64) (*C.VipsImage, error) {
+	incOpCounter("bandjoin_const")
+	var out *C.VipsImage
+
+	if err := C.bandjoin_const(in, &out, (*C.double)(&constants[0]), C.int(len(constants))); err != 0 {
 		return nil, handleImageError(out)
 	}
 
@@ -307,5 +394,71 @@ func vipsComposite2(base *C.VipsImage, overlay *C.VipsImage, mode BlendMode, x, 
 		return nil, handleImageError(out)
 	}
 
+	return out, nil
+}
+
+func vipsInsert(main *C.VipsImage, sub *C.VipsImage, x, y int, expand bool, background *ColorRGBA) (*C.VipsImage, error) {
+	incOpCounter("insert")
+	var out *C.VipsImage
+
+	if background == nil {
+		background = &ColorRGBA{R: 0.0, G: 0.0, B: 0.0, A: 255.0}
+	}
+
+	expandInt := 0
+	if expand {
+		expandInt = 1
+	}
+
+	if err := C.insert_image(main, sub, &out, C.int(x), C.int(y), C.int(expandInt), C.double(background.R), C.double(background.G), C.double(background.B), C.double(background.A)); err != 0 {
+		return nil, handleImageError(out)
+	}
+
+	return out, nil
+}
+
+// https://libvips.github.io/libvips/API/current/libvips-conversion.html#vips-join
+func vipsJoin(input1 *C.VipsImage, input2 *C.VipsImage, dir Direction) (*C.VipsImage, error) {
+	incOpCounter("join")
+	var out *C.VipsImage
+
+	defer C.g_object_unref(C.gpointer(input1))
+	defer C.g_object_unref(C.gpointer(input2))
+	if err := C.join(input1, input2, &out, C.int(dir)); err != 0 {
+		return nil, handleVipsError()
+	}
+	return out, nil
+}
+
+// https://libvips.github.io/libvips/API/current/libvips-conversion.html#vips-arrayjoin
+func vipsArrayJoin(inputs []*C.VipsImage, across int) (*C.VipsImage, error) {
+	incOpCounter("arrayjoin")
+	var out *C.VipsImage
+
+	if err := C.arrayjoin(&inputs[0], &out, C.int(len(inputs)), C.int(across)); err != 0 {
+		return nil, handleVipsError()
+	}
+	return out, nil
+}
+
+// https://www.libvips.org/API/current/libvips-conversion.html#vips-replicate
+func vipsReplicate(in *C.VipsImage, across int, down int) (*C.VipsImage, error) {
+	incOpCounter("replicate")
+	var out *C.VipsImage
+
+	if err := C.replicate(in, &out, C.int(across), C.int(down)); err != 0 {
+		return nil, handleImageError(out)
+	}
+	return out, nil
+}
+
+// https://www.libvips.org/API/current/libvips-conversion.html#vips-grid
+func vipsGrid(in *C.VipsImage, tileHeight, across, down int) (*C.VipsImage, error) {
+	incOpCounter("grid")
+	var out *C.VipsImage
+
+	if err := C.grid(in, &out, C.int(tileHeight), C.int(across), C.int(down)); err != 0 {
+		return nil, handleImageError(out)
+	}
 	return out, nil
 }

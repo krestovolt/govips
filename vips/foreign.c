@@ -234,20 +234,20 @@ int save_buffer(const char *operationName, SaveParams *params,
 }
 
 // https://github.com/libvips/libvips/issues/1719#issuecomment-1545444654
-// static void *
-// print_field_fn( VipsImage *image, const char *field, GValue *value, void *a )
-// {
-// 	char str[256];
-// 	VipsBuf buf = VIPS_BUF_STATIC( str );
-// 	vips_buf_appendgv( &buf, value );
-// 	g_info( ">>>>>>>>>>>>>>>>>>>> key: %s = %s", field, vips_buf_all( &buf ) );
-// 	return( NULL );
-// }
+static void *
+print_field_fn( VipsImage *image, const char *field, GValue *value, void *a )
+{
+	char str[256];
+	VipsBuf buf = VIPS_BUF_STATIC( str );
+	vips_buf_appendgv( &buf, value );
+	g_info( ">>>>>>>>>>>>>>>>>>>> key: %s = %s", field, vips_buf_all( &buf ) );
+	return( NULL );
+}
 
 VipsImage * load_image_source(VipsSourceCustom *source) {
   // https://libvips.github.io/libvips/API/current/VipsImage.html#vips-image-new-from-source
 	VipsImage *img = vips_image_new_from_source( (VipsSource*) source, "", NULL);
-  // vips_image_map( img, print_field_fn, NULL );
+  vips_image_map( img, print_field_fn, NULL );
   return img;
 }
 

@@ -247,7 +247,7 @@ print_field_fn( VipsImage *image, const char *field, GValue *value, void *a )
 VipsImage * load_image_source(VipsSourceCustom *source) {
   // https://libvips.github.io/libvips/API/current/VipsImage.html#vips-image-new-from-source
 	VipsImage *img = vips_image_new_from_source( (VipsSource*) source, "", NULL);
-  vips_image_map( img, print_field_fn, NULL );
+  // vips_image_map( img, print_field_fn, NULL );
   return img;
 }
 

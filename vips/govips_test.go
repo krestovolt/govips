@@ -6,7 +6,6 @@ import (
 
 func TestInitConfig(t *testing.T) {
 	running = false
-	Startup(&Config{CollectStats: true, CacheTrace: true})
-	running = false
+	Startup(&Config{})
 	startupIfNeeded()
 }

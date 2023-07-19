@@ -1,7 +1,6 @@
 package vips
 
 import (
-	"bufio"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -27,8 +26,7 @@ func Test_DeterminePartialImageType__JPEG(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -55,8 +53,7 @@ func Test_DeterminePartialImageType__HEIF_HEIC(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -83,8 +80,7 @@ func Test_DeterminePartialImageType__HEIF_MIF1(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -111,8 +107,7 @@ func Test_DeterminePartialImageType__PNG(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -139,8 +134,7 @@ func Test_DeterminePartialImageType__TIFF(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -167,8 +161,7 @@ func Test_DeterminePartialImageType__WEBP(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -195,8 +188,7 @@ func Test_DeterminePartialImageType__SVG(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -223,8 +215,7 @@ func Test_DeterminePartialImageType__SVG_1(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -251,8 +242,7 @@ func Test_DeterminePartialImageType__PDF(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -280,8 +270,7 @@ func Test_DetermineImageType__BMP(t *testing.T) {
 // 	assert.NoError(t, err)
 // 	assert.NotNil(t, fin)
 
-// 	reader := bufio.NewReader(fin)
-// 	imgRef, err := NewImageFromReader(reader)
+// 	imgRef, err := NewImageFromReader(fin)
 // 	assert.Error(t, err)
 // 	assert.Nil(t, imgRef)
 // 	defer imgRef.Close()
@@ -308,8 +297,7 @@ func Test_DeterminePartialImageType__AVIF(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()
@@ -336,8 +324,7 @@ func Test_DeterminePartialImageType__JP2K(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	assert.NoError(t, err)
 	assert.NotNil(t, imgRef)
 	defer imgRef.Close()

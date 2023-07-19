@@ -1,7 +1,6 @@
 package vips
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,9 +17,7 @@ func Test_VipsCustomSource__JPEG(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	reader := bufio.NewReader(fin)
-
-	imgRef, err := NewImageFromReader(reader)
+	imgRef, err := NewImageFromReader(fin)
 	defer imgRef.Close()
 
 	assert.NoError(t, err)
@@ -31,7 +28,7 @@ func Test_VipsCustomSource__JPEG(t *testing.T) {
 
 	buf, mt, err := imgRef.ExportNative()
 
-	fmt.Printf(">>>> w=%d h=%d b=%d \n", imgRef.Width(), imgRef.Height(), reader.Buffered())
+	fmt.Printf(">>>> w=%d h=%d\n", imgRef.Width(), imgRef.Height())
 	fmt.Printf(">>>> %v %v %v\n", imgRef, len(buf), mt.Format.FileExt())
 
 	imgRef.Close()
@@ -43,10 +40,8 @@ func Benchmark_VipsCustomSource__JPEG(b *testing.B) {
 	startupIfNeeded()
 
 	fin, _ := os.Open(resources + "fur-cats-siamese-cat-like-mammal-395436-pxhere.com.jpg")
-	reader := bufio.NewReader(fin)
-
 	for i := 0; i < b.N; i += 1 {
-		imgRef, _ := NewImageFromReader(reader)
+		imgRef, _ := NewImageFromReader(fin)
 
 		imgRef.Thumbnail(320, 85, InterestingNone)
 		buf, mt, err := imgRef.ExportNative()
@@ -54,6 +49,5 @@ func Benchmark_VipsCustomSource__JPEG(b *testing.B) {
 		}
 
 		fin.Seek(0, io.SeekStart)
-		reader.Reset(fin)
 	}
 }

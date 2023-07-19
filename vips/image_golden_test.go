@@ -1,7 +1,6 @@
 package vips
 
 import (
-	"bufio"
 	"bytes"
 	"image"
 	jpeg2 "image/jpeg"
@@ -965,10 +964,9 @@ func goldenTest(
 	if filepath.Ext(path) != ImageTypeBMP.FileExt() {
 		fileSrc, err := os.Open(path)
 		require.NoError(t, err)
-		reader := bufio.NewReader(fileSrc)
 
 		// VipsCustomSource
-		imgReader, err := NewImageFromReader(reader)
+		imgReader, err := NewImageFromReader(fileSrc)
 		require.NoError(t, err)
 		require.NotEmpty(t, imgReader)
 

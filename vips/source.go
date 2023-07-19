@@ -33,7 +33,7 @@ type Source struct {
 }
 
 // NewSource creates a new image source that uses a regular io.Reader
-func NewSource(image io.Reader) *Source {
+func NewSource(image io.ReadSeeker) *Source {
 	src := &Source{
 		reader: image,
 	}

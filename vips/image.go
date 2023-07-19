@@ -387,7 +387,16 @@ func NewJp2kExportParams() *Jp2kExportParams {
 }
 
 // NewImageFromReader loads an ImageRef from the given reader
-func NewImageFromReader(r io.Reader) (*ImageRef, error) {
+func NewImageFromReader(r io.ReadSeeker) (*ImageRef, error) {
+	h := make([]byte, 2)
+	n, err := r.Read(h)
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, fmt.Errorf("Unable to use empty reader")
+	}
+	r.Seek(0, io.SeekStart)
 	src := NewSource(r)
 
 	img, format, err := vipsLoadSource(src)

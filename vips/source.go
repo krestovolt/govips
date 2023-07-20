@@ -25,7 +25,7 @@ var (
 )
 
 type Source struct {
-	id     int
+	objId  int
 	reader iox.PeekableReader
 	seeker io.Seeker
 	closer io.Closer
@@ -35,6 +35,7 @@ type Source struct {
 	rsigHandle C.gulong
 	// seek signal handler id
 	ssigHandle C.gulong
+	closeOnce  sync.Once
 }
 
 // NewSource creates a new image source that uses a `iox.PeekableReader` (e.g. bufio.Reader)
@@ -62,7 +63,7 @@ func NewSource(image iox.PeekableReader) *Source {
 	sourceMu.Lock()
 	id := sourceCtr
 	sources[id] = src
-	src.id = id
+	src.objId = id
 	sourceCtr++
 	sourceMu.Unlock()
 
@@ -87,22 +88,21 @@ func finalizeSource(src *Source) {
 
 func (s *Source) Close() {
 	sourceMu.Lock()
-	imageID := int(s.id)
-	govipsLog("govips", LogLevelInfo, fmt.Sprintf("Closing source %d", imageID))
+	s.closeOnce.Do(func() {
+		govipsLog("govips", LogLevelInfo, fmt.Sprintf("Closing source %d", s.objId))
 
-	C.free_go_custom_source(s.src, s.args, s.rsigHandle, s.ssigHandle)
+		C.free_go_custom_source(s.src, s.args, s.rsigHandle, s.ssigHandle)
 
-	if s.closer != nil {
 		s.closer.Close()
-	}
 
-	s.closer = nil
-	s.reader = nil
-	s.seeker = nil
-	s.src = nil
-	s.args = nil
-	sources[imageID] = nil
+		s.closer = nil
+		s.reader = nil
+		s.seeker = nil
+		s.src = nil
+		s.args = nil
 
+		delete(sources, s.objId)
+	})
 	sourceMu.Unlock()
 }
 

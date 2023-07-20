@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"io"
 	"io/ioutil"
 	"runtime"
 	"strconv"
@@ -395,7 +396,7 @@ func NewJp2kExportParams() *Jp2kExportParams {
 // Currently this will error when the source image type is '.bmp' (bitmap) because the limitation of vips' imagemagickload implementation.¹
 //
 // [1] https://github.com/libvips/libvips/discussions/3408#discussioncomment-5425544
-func NewImageFromReader(r iox.PeekableReader, sequential bool) (*ImageRef, error) {
+func NewImageSourceFromReader(r iox.PeekableReader, sequential bool) (*ImageRef, error) {
 	src := NewSource(r)
 	img, format, err := vipsLoadSource(src, sequential)
 	if err != nil {
@@ -405,6 +406,16 @@ func NewImageFromReader(r iox.PeekableReader, sequential bool) (*ImageRef, error
 	ref := newImageRefFromSource(src, img, format)
 
 	return ref, nil
+}
+
+// NewImageFromReader loads an ImageRef from the given reader
+func NewImageFromReader(r io.Reader) (*ImageRef, error) {
+	buf, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewImageFromBuffer(buf)
 }
 
 // NewImageFromFile loads an image from file and creates a new ImageRef

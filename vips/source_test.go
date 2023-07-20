@@ -16,7 +16,7 @@ func Test_VipsCustomSource__JPEG(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin, true)
+	imgRef, err := NewImageSourceFromReader(fin, true)
 	defer imgRef.Close()
 
 	assert.NoError(t, err)
@@ -41,7 +41,7 @@ func Benchmark_VipsCustomSource__JPEG(b *testing.B) {
 
 	fin, _ := iox.NewBufferedFileReader(resources + "fur-cats-siamese-cat-like-mammal-395436-pxhere.com.jpg")
 	for i := 0; i < b.N; i += 1 {
-		imgRef, _ := NewImageFromReader(fin, true)
+		imgRef, _ := NewImageSourceFromReader(fin, true)
 
 		imgRef.Thumbnail(320, 85, InterestingNone)
 		buf, mt, err := imgRef.ExportNative()

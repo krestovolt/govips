@@ -26,7 +26,7 @@ func TestImageRef_WebP(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "webp+alpha.webp")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, true)
+	img, err := NewImageSourceFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -40,7 +40,7 @@ func TestImageRef_WebP__ReducedEffort(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "webp+alpha.webp")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, true)
+	img, err := NewImageSourceFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -56,7 +56,7 @@ func TestImageRef_WebP__NearLossless(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "webp+alpha.webp")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, true)
+	img, err := NewImageSourceFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -72,7 +72,7 @@ func TestImageRef_PNG(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "png-24bit.png")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, false)
+	img, err := NewImageSourceFromReader(srcBuf, false)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -89,7 +89,7 @@ func TestImageRef_HEIF(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "heic-24bit-exif.heic")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, true)
+	img, err := NewImageSourceFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -104,7 +104,7 @@ func TestImageRef_HEIF_MIF1(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "heic-24bit.heic")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, true)
+	img, err := NewImageSourceFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -119,7 +119,7 @@ func TestImageRef_HEIF_ftypmsf1(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "heic-ftypmsf1.heic")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, true)
+	img, err := NewImageSourceFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -190,7 +190,7 @@ func TestImageRef_OverSizedMetadata(t *testing.T) {
 	srcBuf, err := iox.NewBufferedFileReader(resources + "png-bad-metadata.png")
 	require.NoError(t, err)
 
-	img, err := NewImageFromReader(srcBuf, true)
+	img, err := NewImageSourceFromReader(srcBuf, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, img)
 }
@@ -876,12 +876,12 @@ func TestDeprecatedExportParams(t *testing.T) {
 	assert.Equal(t, 6, pngExportParams.Compression)
 }
 
-func TestNewImageFromReaderFail(t *testing.T) {
+func TestNewImageSourceFromReaderFail(t *testing.T) {
 	rs := strings.NewReader("")
 
 	bufr := bufio.NewReader(rs)
 
-	buf, err := NewImageFromReader(bufr, true)
+	buf, err := NewImageSourceFromReader(bufr, true)
 
 	assert.Nil(t, buf)
 	assert.Error(t, err)

@@ -963,7 +963,7 @@ func goldenTest(
 	require.NoError(t, err)
 
 	// VipsCustomSource
-	imgReader, err := NewImageFromReader(fileSrc, useSequential)
+	imgReader, err := NewImageSourceFromReader(fileSrc, useSequential)
 	// bitmap is currently not supported
 	// https://github.com/libvips/libvips/issues/3405#issuecomment-1483778760
 	if el, ok := err.(*LoadImageError); ok {

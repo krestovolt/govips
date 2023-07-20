@@ -96,6 +96,41 @@ func TestMemoryLeak__File(t *testing.T) {
 	assert.True(t, delta < 10*1024*1024, "Memory usage delta too big: %d", delta)
 }
 
+func TestMemoryLeak__Reader(t *testing.T) {
+	vips.Startup(&vips.Config{
+		ReportLeaks: true,
+	})
+
+	iteration := func() {
+		buf, err := iox.NewBufferedFileReader(resources + "png-24bit.png")
+		require.NoError(t, err)
+		ref, err := vips.NewImageFromReader(buf)
+		require.NoError(t, err)
+		defer runtime.KeepAlive(ref)
+
+		_, err = ref.ToBytes()
+		assert.NoError(t, err)
+	}
+
+	// First iteration for some constant allocations...
+	iteration()
+	runtime.GC()
+
+	var after, before vips.MemoryStats
+	vips.ReadVipsMemStats(&before)
+
+	// More image processing iterations
+	for pass := 1; pass < 5; pass++ {
+		iteration()
+		runtime.GC()
+	}
+
+	vips.ReadVipsMemStats(&after)
+	delta := after.Mem - before.Mem
+	t.Log(fmt.Sprintf("Memory usage: before %d, after %d, delta %d", before.Mem, after.Mem, delta))
+	assert.True(t, delta < 10*1024*1024, "Memory usage delta too big: %d", delta)
+}
+
 func TestMemoryLeak__Source(t *testing.T) {
 	vips.Startup(&vips.Config{
 		ReportLeaks: true,
@@ -105,7 +140,7 @@ func TestMemoryLeak__Source(t *testing.T) {
 		buf, err := iox.NewBufferedFileReader(resources + "png-24bit.png")
 		require.NoError(t, err)
 
-		ref, err := vips.NewImageFromReader(buf, true)
+		ref, err := vips.NewImageSourceFromReader(buf, true)
 		require.NoError(t, err)
 		defer runtime.KeepAlive(ref)
 

@@ -8,13 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"io"
 	"io/ioutil"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"unsafe"
+
+	"github.com/davidbyttow/govips/v2/vips/iox"
 )
 
 const GaussBlurDefaultMinAMpl = 0.2
@@ -386,20 +387,17 @@ func NewJp2kExportParams() *Jp2kExportParams {
 	}
 }
 
-// NewImageFromReader loads an ImageRef from the given reader
-func NewImageFromReader(r io.ReadSeeker) (*ImageRef, error) {
-	h := make([]byte, 2)
-	n, err := r.Read(h)
-	if err != nil {
-		return nil, err
-	}
-	if n == 0 {
-		return nil, fmt.Errorf("Unable to use empty reader")
-	}
-	r.Seek(0, io.SeekStart)
+// NewImageFromReader loads an ImageRef from the given `iox.PeekableReader`. If `sequential` sets to `true`, you can only do one-shot processing
+// since the source will be treated as a stream of data.
+//
+// Note:
+//
+// Currently this will error when the source image type is '.bmp' (bitmap) because the limitation of vips' imagemagickload implementation.¹
+//
+// [1] https://github.com/libvips/libvips/discussions/3408#discussioncomment-5425544
+func NewImageFromReader(r iox.PeekableReader, sequential bool) (*ImageRef, error) {
 	src := NewSource(r)
-
-	img, format, err := vipsLoadSource(src)
+	img, format, err := vipsLoadSource(src, sequential)
 	if err != nil {
 		return nil, err
 	}

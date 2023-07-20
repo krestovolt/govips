@@ -9,9 +9,9 @@ import (
 	"image/png"
 	"math"
 	"runtime"
-	"strings"
 	"unsafe"
 
+	"github.com/davidbyttow/govips/v2/vips/iox"
 	"golang.org/x/image/bmp"
 	"golang.org/x/net/html/charset"
 )
@@ -118,9 +118,7 @@ const (
 )
 
 const (
-	HEIF_META_COMPRESSION = "heif-compression"
-	HEIF_COMPRESSION_HEIC = "hevc"
-	HEIF_COMPRESSION_AVIF = "av1"
+	imageTypePeekLen = 12
 )
 
 // FileExt returns the canonical extension for the ImageType
@@ -138,44 +136,14 @@ func IsTypeSupported(imageType ImageType) bool {
 	return supportedImageTypes[imageType]
 }
 
-func determinePartialImageType(img *C.VipsImage) ImageType {
-	loaderMeta, _ := vipsImageGetMetaLoader(img)
-	loaderMeta = strings.ToLower(loaderMeta)
-	switch loaderMeta {
-	case "gifload_source":
-		return ImageTypeGIF
-	case "heifload_source":
-		compression := vipsImageGetString(img, HEIF_META_COMPRESSION)
-		compression = strings.ToLower(compression)
-		switch compression {
-		case HEIF_COMPRESSION_HEIC:
-			// heif-compression == hevc -> ImageTypeHEIF
-			return ImageTypeHEIF
-		case HEIF_COMPRESSION_AVIF:
-			// heif-compression == av1  -> ImageTypeAvif
-			return ImageTypeAVIF
-		}
-		return ImageTypeUnknown
-	case "jp2kload_source":
-		return ImageTypeJP2K
-	// case "jxlload_source":
-	case "jpegload_source":
-		return ImageTypeJPEG
-	case "pdfload_source":
-		return ImageTypePDF
-	case "pngload_source":
-		return ImageTypePNG
-	case "svgload_source":
-		return ImageTypeSVG
-	case "tiffload_source":
-		return ImageTypeTIFF
-	case "webpload_source":
-		return ImageTypeWEBP
+// DetermineImageReaderType attempts to determine the image type of the given `io.Reader` by peeking on the first 12 bytes
+func DetermineImageReaderType(reader iox.PeekableReader) (ImageType, error) {
+	fb12, err := reader.Peek(imageTypePeekLen)
+	if err != nil {
+		return ImageTypeUnknown, err
 	}
-	// ImageTypeMagick // doesn't have source loader
-	govipsLog("govips", LogLevelWarning, fmt.Sprintf("loader %s is not supported", loaderMeta))
 
-	return ImageTypeUnknown
+	return DetermineImageType(fb12), nil
 }
 
 // DetermineImageType attempts to determine the image type of the given buffer
@@ -279,6 +247,11 @@ func isSVG(buf []byte) bool {
 	return false
 }
 
+func isImageSvg(in *C.VipsImage) bool {
+	format := vipsDetermineImageTypeFromMetaLoader(in)
+	return format == ImageTypeSVG
+}
+
 var pdf = []byte("\x25\x50\x44\x46")
 
 func isPDF(buf []byte) bool {
@@ -299,13 +272,27 @@ func isJP2K(buf []byte) bool {
 	return bytes.HasPrefix(buf, jp2kHeader)
 }
 
-func vipsLoadSource(src *Source) (*C.VipsImage, ImageType, error) {
-	img := C.load_image_source(src.src)
-	if img == nil {
-		return nil, ImageTypeUnknown, fmt.Errorf("error loading image from source")
+func vipsLoadSource(src *Source, sequential bool) (*C.VipsImage, ImageType, error) {
+	format, err := DetermineImageReaderType(src.reader)
+	if err != nil {
+		return nil, ImageTypeUnknown, err
 	}
 
-	format := determinePartialImageType(img)
+	var img *C.struct__VipsImage
+
+	if sequential {
+		img = C.load_image_source_seq(src.src)
+	} else {
+		img = C.load_image_source(src.src)
+	}
+	if img == nil {
+		return nil, ImageTypeUnknown, newLoadImageError(handleImageError(img), format)
+	}
+
+	if format == ImageTypeUnknown && err == nil {
+		format = vipsDetermineImageTypeFromMetaLoader(img)
+	}
+
 	return img, format, nil
 }
 

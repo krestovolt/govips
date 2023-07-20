@@ -7,6 +7,12 @@ import (
 	"unsafe"
 )
 
+const (
+	HEIF_META_COMPRESSION = "heif-compression"
+	HEIF_COMPRESSION_HEIC = "hevc"
+	HEIF_COMPRESSION_AVIF = "av1"
+)
+
 func vipsHasICCProfile(in *C.VipsImage) bool {
 	return int(C.has_icc_profile(in)) != 0
 }
@@ -180,7 +186,17 @@ func vipsDetermineImageTypeFromMetaLoader(in *C.VipsImage) ImageType {
 		return ImageTypeTIFF
 	}
 	if strings.HasPrefix(vipsLoader, "heif") {
-		return ImageTypeHEIF
+		compression := vipsImageGetString(in, HEIF_META_COMPRESSION)
+		compression = strings.ToLower(compression)
+		switch compression {
+		case HEIF_COMPRESSION_HEIC:
+			// heif-compression == hevc -> ImageTypeHEIF
+			return ImageTypeHEIF
+		case HEIF_COMPRESSION_AVIF:
+			// heif-compression == av1  -> ImageTypeAvif
+			return ImageTypeAVIF
+		}
+		return ImageTypeUnknown
 	}
 	if strings.HasPrefix(vipsLoader, "pdf") {
 		return ImageTypePDF

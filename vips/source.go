@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime"
 	"sync"
 	"unsafe"
+
+	"github.com/davidbyttow/govips/v2/vips/iox"
 )
 
 var (
@@ -22,8 +25,10 @@ var (
 )
 
 type Source struct {
-	reader io.Reader
+	id     int
+	reader iox.PeekableReader
 	seeker io.Seeker
+	closer io.Closer
 	args   *C.struct__GoSourceArguments
 	src    *C.struct__VipsSourceCustom
 	// read signal handler id
@@ -32,21 +37,33 @@ type Source struct {
 	ssigHandle C.gulong
 }
 
-// NewSource creates a new image source that uses a regular io.Reader
-func NewSource(image io.ReadSeeker) *Source {
+// NewSource creates a new image source that uses a `iox.PeekableReader` (e.g. bufio.Reader)
+//
+// By default it will attach a `read` signal and call the `Read` method of the reader,
+// if the reader also supports the `io.Seeker` then the `seek` signal handler would also be attached.
+//
+// The needs of `iox.PeekableReader` interface determined by how the internal load function extract the `vips.ImageType` from the actual source's reader.
+// The load function needs to get the first 12 bytes without advancing the reader position, this makes it possible to prevent reading invalid buffer that can cause a whole application to crash (or segvault-ing).
+func NewSource(image iox.PeekableReader) *Source {
 	src := &Source{
 		reader: image,
 	}
 
-	skr, ok := image.(io.ReadSeeker)
+	skr, ok := image.(io.Seeker)
 	if ok {
 		src.seeker = skr
 	}
 
+	clr, ok := image.(io.Closer)
+	if ok {
+		src.closer = clr
+	}
+
 	sourceMu.Lock()
-	sourceCtr++
 	id := sourceCtr
 	sources[id] = src
+	src.id = id
+	sourceCtr++
 	sourceMu.Unlock()
 
 	govipsLog("govips", LogLevelDebug, fmt.Sprintf("Created image source %d", id))
@@ -56,21 +73,37 @@ func NewSource(image io.ReadSeeker) *Source {
 	src.rsigHandle = C.connect_go_signal_read(src.src, src.args)
 	src.ssigHandle = C.connect_go_signal_seek(src.src, src.args)
 
+	runtime.SetFinalizer(src, finalizeSource)
+
 	return src
 }
 
-func (s *Source) Close() {
-	imageID := int(s.args.image_id)
-	govipsLog("govips", LogLevelDebug, fmt.Sprintf("Closing source %d", imageID))
-
-	sourceMu.Lock()
-	sources[imageID] = nil
-	s.free()
-	sourceMu.Unlock()
+func finalizeSource(src *Source) {
+	govipsLog("govips", LogLevelDebug, fmt.Sprintf("closing image %p", src))
+	if src != nil {
+		src.Close()
+	}
 }
 
-func (s *Source) free() {
+func (s *Source) Close() {
+	sourceMu.Lock()
+	imageID := int(s.id)
+	govipsLog("govips", LogLevelInfo, fmt.Sprintf("Closing source %d", imageID))
+
 	C.free_go_custom_source(s.src, s.args, s.rsigHandle, s.ssigHandle)
+
+	if s.closer != nil {
+		s.closer.Close()
+	}
+
+	s.closer = nil
+	s.reader = nil
+	s.seeker = nil
+	s.src = nil
+	s.args = nil
+	sources[imageID] = nil
+
+	sourceMu.Unlock()
 }
 
 //export goSourceRead

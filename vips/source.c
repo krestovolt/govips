@@ -1,10 +1,10 @@
 #include "source.h"
 
-GoSourceArguments * create_go_source_arguments( int image_id )
+GoSourceArguments * create_go_source_arguments( char * owner_object_id )
 {
 	GoSourceArguments * source_args;
 	source_args = malloc(sizeof(GoSourceArguments));
-	source_args->image_id = image_id;
+	source_args->owner_object_id = owner_object_id;
 
 	return source_args;
 }
@@ -36,16 +36,20 @@ void free_go_custom_source(VipsSourceCustom *source_custom, GoSourceArguments * 
 	}
 
 	if (source_args != NULL) {
+		if (source_args->owner_object_id != NULL) {
+			free(source_args->owner_object_id);
+		}
+
 		free(source_args);
 	}
 }
 
 static gint64 go_read ( VipsSourceCustom *source_custom, void *buffer, gint64 length, GoSourceArguments * source_args )
 {
-    return goSourceRead(source_args->image_id, buffer, length);
+    return goSourceRead(source_args->owner_object_id, buffer, length);
 }
 
 static gint64 go_seek ( VipsSourceCustom *source_custom, gint64 offset, int whence, GoSourceArguments * source_args )
 {
-	return goSourceSeek(source_args->image_id, offset, whence);
+	return goSourceSeek(source_args->owner_object_id, offset, whence);
 }

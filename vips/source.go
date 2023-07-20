@@ -9,28 +9,26 @@ import (
 	"io"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"unsafe"
 
 	"github.com/davidbyttow/govips/v2/vips/iox"
+	"github.com/google/uuid"
 )
 
 var (
-	// FIXME: need to find a way to handle this properly,
-	// maybe the `sources` will grow indefinitely if this is used in long-lived
-	// process?
-	sourceCtr int
-	sources   = make(map[int]*Source)
-	sourceMu  = sync.RWMutex{}
+	sourcesMap = make(map[string]*Source)
+	sourceMu   = sync.RWMutex{}
 )
 
 type Source struct {
-	objId  int
-	reader iox.PeekableReader
-	seeker io.Seeker
-	closer io.Closer
-	args   *C.struct__GoSourceArguments
-	src    *C.struct__VipsSourceCustom
+	objectId string
+	reader   iox.PeekableReader
+	seeker   io.Seeker
+	closer   io.Closer
+	args     *C.struct__GoSourceArguments
+	src      *C.struct__VipsSourceCustom
 	// read signal handler id
 	rsigHandle C.gulong
 	// seek signal handler id
@@ -61,15 +59,24 @@ func NewSource(image iox.PeekableReader) *Source {
 	}
 
 	sourceMu.Lock()
-	id := sourceCtr
-	sources[id] = src
-	src.objId = id
-	sourceCtr++
+	for i := 0; i < 5; i += 1 {
+		id := getUniqueId()
+		if _, exists := sourcesMap[id]; !exists {
+			src.objectId = id
+			sourcesMap[id] = src
+			break
+		}
+		if i+1 == 5 {
+			panic(errors.New("Cannot find unique ID"))
+		}
+	}
 	sourceMu.Unlock()
 
-	govipsLog("govips", LogLevelDebug, fmt.Sprintf("Created image source %d", id))
+	govipsLog("govips", LogLevelDebug, fmt.Sprintf("Created image source %s", src.objectId))
 
-	src.args = C.create_go_source_arguments(C.int(id))
+	cId := C.CString(src.objectId) // will be managed by _GoSourceArguments lifecycle
+	src.args = C.create_go_source_arguments(cId)
+
 	src.src = C.create_go_custom_source(src.args)
 	src.rsigHandle = C.connect_go_signal_read(src.src, src.args)
 	src.ssigHandle = C.connect_go_signal_seek(src.src, src.args)
@@ -77,6 +84,11 @@ func NewSource(image iox.PeekableReader) *Source {
 	runtime.SetFinalizer(src, finalizeSource)
 
 	return src
+}
+
+func getUniqueId() string {
+	uid := uuid.NewString()
+	return strings.ReplaceAll(uid, "-", "")
 }
 
 func finalizeSource(src *Source) {
@@ -89,7 +101,7 @@ func finalizeSource(src *Source) {
 func (s *Source) Close() {
 	sourceMu.Lock()
 	s.closeOnce.Do(func() {
-		govipsLog("govips", LogLevelInfo, fmt.Sprintf("Closing source %d", s.objId))
+		govipsLog("govips", LogLevelInfo, fmt.Sprintf("Closing source %s", s.objectId))
 
 		C.free_go_custom_source(s.src, s.args, s.rsigHandle, s.ssigHandle)
 
@@ -101,19 +113,21 @@ func (s *Source) Close() {
 		s.src = nil
 		s.args = nil
 
-		delete(sources, s.objId)
+		delete(sourcesMap, s.objectId)
 	})
 	sourceMu.Unlock()
 }
 
 //export goSourceRead
-func goSourceRead(cImageID C.int, buffer unsafe.Pointer, bufSize C.gint64) (read C.gint64) {
-	imageID := int(cImageID)
+func goSourceRead(ownerObjectId *C.char, buffer unsafe.Pointer, bufSize C.gint64) (read C.gint64) {
+	gOwnerObjectId := C.GoString(ownerObjectId)
+
 	sourceMu.RLock()
-	src, ok := sources[imageID]
+	src, ok := sourcesMap[gOwnerObjectId]
 	sourceMu.RUnlock()
+
 	if !ok {
-		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceRead[id %d]: Source not found", imageID))
+		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceRead[id %s]: Source not found", gOwnerObjectId))
 		return -1
 	}
 
@@ -127,30 +141,31 @@ func goSourceRead(cImageID C.int, buffer unsafe.Pointer, bufSize C.gint64) (read
 
 	n, err := src.reader.Read(buf)
 	if errors.Is(err, io.EOF) {
-		govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %d]: EOF [read %d]", imageID, n))
+		govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %s]: EOF [read %d]", gOwnerObjectId, n))
 		return C.gint64(n)
 	} else if err != nil {
-		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceRead[id %d]: Error: %v [read %d]", imageID, err, n))
+		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceRead[id %s]: Error: %v [read %d]", gOwnerObjectId, err, n))
 		return -1
 	}
 
-	govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %d]: OK [read %d]", imageID, n))
+	govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %s]: OK [read %d]", gOwnerObjectId, n))
 	return C.gint64(n)
 }
 
 //export goSourceSeek
-func goSourceSeek(cImageID C.int, offset C.gint64, cWhence C.int) (newOffset C.gint64) {
-	imageID := int(cImageID)
+func goSourceSeek(ownerObjectId *C.char, offset C.gint64, cWhence C.int) (newOffset C.gint64) {
+	gOwnerObjectId := C.GoString(ownerObjectId)
 	sourceMu.RLock()
-	src, ok := sources[imageID]
+	src, ok := sourcesMap[gOwnerObjectId]
 	sourceMu.RUnlock()
+
 	if !ok {
-		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceSeek[id %d]: Source not found", imageID))
+		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceSeek[id %s]: Source not found", gOwnerObjectId))
 		return -1 // Not found
 	}
 
 	if src.seeker == nil {
-		govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %d]: Seek not supported", imageID))
+		govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceRead[id %s]: Seek not supported", gOwnerObjectId))
 		return -1 // Unsupported!
 	}
 
@@ -158,17 +173,17 @@ func goSourceSeek(cImageID C.int, offset C.gint64, cWhence C.int) (newOffset C.g
 	switch whence {
 	case io.SeekStart, io.SeekCurrent, io.SeekEnd:
 	default:
-		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceSeek[id %d]: Invalid whence value [%d]", imageID, whence))
+		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceSeek[id %s]: Invalid whence value [%d]", gOwnerObjectId, whence))
 		return -1
 	}
 
 	n, err := src.seeker.Seek(int64(offset), whence)
 	if err != nil {
-		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceSeek[id %d]: Error: %v [offset %d | whence %d]", imageID, err, n, whence))
+		govipsLog("govips", LogLevelError, fmt.Sprintf("goSourceSeek[id %s]: Error: %v [offset %d | whence %d]", gOwnerObjectId, err, n, whence))
 		return -1
 	}
 
-	govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceSeek[id %d]: OK [seek %d | whence %d]", imageID, n, whence))
+	govipsLog("govips", LogLevelDebug, fmt.Sprintf("goSourceSeek[id %s]: OK [seek %d | whence %d]", gOwnerObjectId, n, whence))
 
 	return C.gint64(n)
 }

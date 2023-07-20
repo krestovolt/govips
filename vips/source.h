@@ -1,13 +1,13 @@
 #include <vips/vips.h>
 
-extern gint64 goSourceRead(int image_id, void *buffer, gint64 length);
-extern gint64 goSourceSeek(int image_id, gint64 offset, int whence);
+extern gint64 goSourceRead(char * owner_object_id, void *buffer, gint64 length);
+extern gint64 goSourceSeek(char * owner_object_id, gint64 offset, int whence);
 
 typedef struct _GoSourceArguments {
-	int image_id;
+	char *owner_object_id;
 } GoSourceArguments;
 
-GoSourceArguments * create_go_source_arguments( int image_id );
+GoSourceArguments * create_go_source_arguments( char * owner_object_id );
 VipsSourceCustom * create_go_custom_source( GoSourceArguments * source_args );
 gulong connect_go_signal_read(VipsSourceCustom *source_custom, GoSourceArguments * source_args);
 gulong connect_go_signal_seek(VipsSourceCustom *source_custom, GoSourceArguments * source_args);

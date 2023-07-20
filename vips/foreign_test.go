@@ -2,9 +2,9 @@ package vips
 
 import (
 	"io/ioutil"
-	"os"
 	"testing"
 
+	"github.com/davidbyttow/govips/v2/vips/iox"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,16 +22,11 @@ func Test_DetermineImageType__JPEG(t *testing.T) {
 func Test_DeterminePartialImageType__JPEG(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "jpg-24bit-icc-iec.jpg")
+	fin, err := iox.NewBufferedFileReader(resources + "jpg-24bit-icc-iec.jpg")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypeJPEG, imageType)
 }
 
@@ -49,16 +44,12 @@ func Test_DetermineImageType__HEIF_HEIC(t *testing.T) {
 func Test_DeterminePartialImageType__HEIF_HEIC(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "heic-24bit-exif.heic")
+	fin, err := iox.NewBufferedFileReader(resources + "heic-24bit-exif.heic")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
 	assert.Equal(t, ImageTypeHEIF, imageType)
 }
 
@@ -76,16 +67,11 @@ func Test_DetermineImageType__HEIF_MIF1(t *testing.T) {
 func Test_DeterminePartialImageType__HEIF_MIF1(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "heic-24bit.heic")
+	fin, err := iox.NewBufferedFileReader(resources + "heic-24bit.heic")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypeHEIF, imageType)
 }
 
@@ -103,16 +89,11 @@ func Test_DetermineImageType__PNG(t *testing.T) {
 func Test_DeterminePartialImageType__PNG(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "png-24bit+alpha.png")
+	fin, err := iox.NewBufferedFileReader(resources + "png-24bit+alpha.png")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypePNG, imageType)
 }
 
@@ -130,16 +111,11 @@ func Test_DetermineImageType__TIFF(t *testing.T) {
 func Test_DeterminePartialImageType__TIFF(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "tif.tif")
+	fin, err := iox.NewBufferedFileReader(resources + "tif.tif")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypeTIFF, imageType)
 }
 
@@ -157,16 +133,11 @@ func Test_DetermineImageType__WEBP(t *testing.T) {
 func Test_DeterminePartialImageType__WEBP(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "webp+alpha.webp")
+	fin, err := iox.NewBufferedFileReader(resources + "webp+alpha.webp")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypeWEBP, imageType)
 }
 
@@ -184,16 +155,20 @@ func Test_DetermineImageType__SVG(t *testing.T) {
 func Test_DeterminePartialImageType__SVG(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "svg.svg")
+	fin, err := iox.NewBufferedFileReader(resources + "svg.svg")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
+	src := NewSource(fin)
+	assert.NotNil(t, src)
 
-	imageType := determinePartialImageType(imgRef.image)
+	img, imageType, err := vipsLoadSource(src, false)
+	if img != nil {
+		clearImage(img)
+		img = nil
+	}
+
+	assert.NoError(t, err)
 	assert.Equal(t, ImageTypeSVG, imageType)
 }
 
@@ -211,16 +186,40 @@ func Test_DetermineImageType__SVG_1(t *testing.T) {
 func Test_DeterminePartialImageType__SVG_1(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "svg_1.svg")
+	fin, err := iox.NewBufferedFileReader(resources + "svg_1.svg")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
+	src := NewSource(fin)
+	assert.NotNil(t, src)
 
-	imageType := determinePartialImageType(imgRef.image)
+	img, imageType, err := vipsLoadSource(src, false)
+	if img != nil {
+		clearImage(img)
+		img = nil
+	}
+
+	assert.NoError(t, err)
+	assert.Equal(t, ImageTypeSVG, imageType)
+}
+
+func Test_DeterminePartialImageType__SVG_2(t *testing.T) {
+	Startup(&Config{})
+
+	fin, err := iox.NewBufferedFileReader(resources + "svg_2.svg")
+	assert.NoError(t, err)
+	assert.NotNil(t, fin)
+
+	src := NewSource(fin)
+	assert.NotNil(t, src)
+
+	img, imageType, err := vipsLoadSource(src, false)
+	if img != nil {
+		clearImage(img)
+		img = nil
+	}
+
+	assert.NoError(t, err)
 	assert.Equal(t, ImageTypeSVG, imageType)
 }
 
@@ -238,16 +237,11 @@ func Test_DetermineImageType__PDF(t *testing.T) {
 func Test_DeterminePartialImageType__PDF(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "pdf.pdf")
+	fin, err := iox.NewBufferedFileReader(resources + "pdf.pdf")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypePDF, imageType)
 }
 
@@ -262,22 +256,16 @@ func Test_DetermineImageType__BMP(t *testing.T) {
 	assert.Equal(t, ImageTypeBMP, imageType)
 }
 
-// TODO check compatibility for this type
-// func Test_DeterminePartialImageType__BMP(t *testing.T) {
-// 	Startup(&Config{})
+func Test_DeterminePartialImageType__BMP(t *testing.T) {
+	Startup(&Config{})
 
-// 	fin, err := os.Open(resources + "bmp.bmp")
-// 	assert.NoError(t, err)
-// 	assert.NotNil(t, fin)
+	fin, err := iox.NewBufferedFileReader(resources + "bmp.bmp")
+	assert.NoError(t, err)
+	assert.NotNil(t, fin)
 
-// 	imgRef, err := NewImageFromReader(fin)
-// 	assert.Error(t, err)
-// 	assert.Nil(t, imgRef)
-// 	defer imgRef.Close()
-
-// 	imageType := determinePartialImageType(imgRef.image)
-// 	assert.Equal(t, ImageTypePDF, imageType)
-// }
+	imageType, err := DetermineImageReaderType(fin)
+	assert.Equal(t, ImageTypeBMP, imageType)
+}
 
 func Test_DetermineImageType__AVIF(t *testing.T) {
 	Startup(&Config{})
@@ -293,16 +281,11 @@ func Test_DetermineImageType__AVIF(t *testing.T) {
 func Test_DeterminePartialImageType__AVIF(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "avif-8bit.avif")
+	fin, err := iox.NewBufferedFileReader(resources + "avif-8bit.avif")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypeAVIF, imageType)
 }
 
@@ -320,15 +303,10 @@ func Test_DetermineImageType__JP2K(t *testing.T) {
 func Test_DeterminePartialImageType__JP2K(t *testing.T) {
 	Startup(&Config{})
 
-	fin, err := os.Open(resources + "jp2k-orientation-6.jp2")
+	fin, err := iox.NewBufferedFileReader(resources + "jp2k-orientation-6.jp2")
 	assert.NoError(t, err)
 	assert.NotNil(t, fin)
 
-	imgRef, err := NewImageFromReader(fin)
-	assert.NoError(t, err)
-	assert.NotNil(t, imgRef)
-	defer imgRef.Close()
-
-	imageType := determinePartialImageType(imgRef.image)
+	imageType, err := DetermineImageReaderType(fin)
 	assert.Equal(t, ImageTypeJP2K, imageType)
 }

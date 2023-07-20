@@ -6,15 +6,14 @@ import (
 	jpeg2 "image/jpeg"
 	"image/png"
 	"io/ioutil"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
 	"golang.org/x/image/bmp"
 
+	"github.com/davidbyttow/govips/v2/vips/iox"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -939,7 +938,9 @@ func goldenTest(
 	validate func(img *ImageRef),
 	export func(img *ImageRef) ([]byte, *ImageMetadata, error),
 ) []byte {
+	useSequential := false
 	if exec == nil {
+		useSequential = true
 		exec = func(*ImageRef) error { return nil }
 	}
 
@@ -958,15 +959,17 @@ func goldenTest(
 
 	imgRefs := []*ImageRef{imgFile}
 
-	// FIXME need a cleaner way to handle BMP image to prevent segvault
-	// bitmap is currently not supported (I assume)
-	// https://github.com/libvips/libvips/issues/3405#issuecomment-1483778760
-	if filepath.Ext(path) != ImageTypeBMP.FileExt() {
-		fileSrc, err := os.Open(path)
-		require.NoError(t, err)
+	fileSrc, err := iox.NewBufferedFileReader(path)
+	require.NoError(t, err)
 
-		// VipsCustomSource
-		imgReader, err := NewImageFromReader(fileSrc)
+	// VipsCustomSource
+	imgReader, err := NewImageFromReader(fileSrc, useSequential)
+	// bitmap is currently not supported
+	// https://github.com/libvips/libvips/issues/3405#issuecomment-1483778760
+	if el, ok := err.(*LoadImageError); ok {
+		require.Error(t, el)
+		require.Equal(t, ImageTypeBMP, el.Format)
+	} else {
 		require.NoError(t, err)
 		require.NotEmpty(t, imgReader)
 

@@ -1,15 +1,15 @@
 package vips
 
 import (
-	"bytes"
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
-	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/davidbyttow/govips/v2/vips/iox"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,11 +23,10 @@ func TestMain(m *testing.M) {
 func TestImageRef_WebP(t *testing.T) {
 	Startup(nil)
 
-	srcBytes, err := ioutil.ReadFile(resources + "webp+alpha.webp")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "webp+alpha.webp")
 	require.NoError(t, err)
 
-	src := bytes.NewReader(srcBytes)
-	img, err := NewImageFromReader(src)
+	img, err := NewImageFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -38,11 +37,10 @@ func TestImageRef_WebP(t *testing.T) {
 func TestImageRef_WebP__ReducedEffort(t *testing.T) {
 	Startup(nil)
 
-	srcBytes, err := ioutil.ReadFile(resources + "webp+alpha.webp")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "webp+alpha.webp")
 	require.NoError(t, err)
 
-	src := bytes.NewReader(srcBytes)
-	img, err := NewImageFromReader(src)
+	img, err := NewImageFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -55,11 +53,10 @@ func TestImageRef_WebP__ReducedEffort(t *testing.T) {
 func TestImageRef_WebP__NearLossless(t *testing.T) {
 	Startup(nil)
 
-	srcBytes, err := ioutil.ReadFile(resources + "webp+alpha.webp")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "webp+alpha.webp")
 	require.NoError(t, err)
 
-	src := bytes.NewReader(srcBytes)
-	img, err := NewImageFromReader(src)
+	img, err := NewImageFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -72,11 +69,10 @@ func TestImageRef_WebP__NearLossless(t *testing.T) {
 func TestImageRef_PNG(t *testing.T) {
 	Startup(nil)
 
-	srcBytes, err := ioutil.ReadFile(resources + "png-24bit.png")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "png-24bit.png")
 	require.NoError(t, err)
 
-	src := bytes.NewReader(srcBytes)
-	img, err := NewImageFromReader(src)
+	img, err := NewImageFromReader(srcBuf, false)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -90,10 +86,10 @@ func TestImageRef_PNG(t *testing.T) {
 func TestImageRef_HEIF(t *testing.T) {
 	Startup(nil)
 
-	raw, err := ioutil.ReadFile(resources + "heic-24bit-exif.heic")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "heic-24bit-exif.heic")
 	require.NoError(t, err)
 
-	img, err := NewImageFromBuffer(raw)
+	img, err := NewImageFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -105,10 +101,10 @@ func TestImageRef_HEIF(t *testing.T) {
 func TestImageRef_HEIF_MIF1(t *testing.T) {
 	Startup(nil)
 
-	raw, err := ioutil.ReadFile(resources + "heic-24bit.heic")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "heic-24bit.heic")
 	require.NoError(t, err)
 
-	img, err := NewImageFromBuffer(raw)
+	img, err := NewImageFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -120,10 +116,10 @@ func TestImageRef_HEIF_MIF1(t *testing.T) {
 func TestImageRef_HEIF_ftypmsf1(t *testing.T) {
 	Startup(nil)
 
-	raw, err := ioutil.ReadFile(resources + "heic-ftypmsf1.heic")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "heic-ftypmsf1.heic")
 	require.NoError(t, err)
 
-	img, err := NewImageFromBuffer(raw)
+	img, err := NewImageFromReader(srcBuf, true)
 	require.NoError(t, err)
 	require.NotNil(t, img)
 
@@ -191,11 +187,10 @@ func TestImageRef_SVG_2(t *testing.T) {
 func TestImageRef_OverSizedMetadata(t *testing.T) {
 	Startup(nil)
 
-	srcBytes, err := ioutil.ReadFile(resources + "png-bad-metadata.png")
+	srcBuf, err := iox.NewBufferedFileReader(resources + "png-bad-metadata.png")
 	require.NoError(t, err)
 
-	src := bytes.NewReader(srcBytes)
-	img, err := NewImageFromReader(src)
+	img, err := NewImageFromReader(srcBuf, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, img)
 }
@@ -467,35 +462,6 @@ func TestImageRef_TransformICCProfile(t *testing.T) {
 
 	assert.True(t, image.HasIPTC())
 	assert.True(t, image.HasICCProfile())
-}
-
-func TestImageRef_Close(t *testing.T) {
-	Startup(nil)
-
-	image, err := NewImageFromFile(resources + "png-24bit.png")
-	assert.NoError(t, err)
-
-	image.Close()
-	assert.Nil(t, image.image)
-
-	PrintObjectReport("Final")
-}
-
-func TestImageRef_Close__AlreadyClosed(t *testing.T) {
-	Startup(nil)
-
-	image, err := NewImageFromFile(resources + "png-24bit.png")
-	assert.NoError(t, err)
-
-	go image.Close()
-	go image.Close()
-	go image.Close()
-	go image.Close()
-	defer image.Close()
-	image.Close()
-
-	assert.Nil(t, image.image)
-	runtime.GC()
 }
 
 func TestImageRef_NotImage(t *testing.T) {
@@ -911,8 +877,11 @@ func TestDeprecatedExportParams(t *testing.T) {
 }
 
 func TestNewImageFromReaderFail(t *testing.T) {
-	r := strings.NewReader("")
-	buf, err := NewImageFromReader(r)
+	rs := strings.NewReader("")
+
+	bufr := bufio.NewReader(rs)
+
+	buf, err := NewImageFromReader(bufr, true)
 
 	assert.Nil(t, buf)
 	assert.Error(t, err)

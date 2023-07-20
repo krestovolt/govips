@@ -1,7 +1,6 @@
 package mem_tests
 
 import (
-	"fmt"
 	"io/ioutil"
 	"testing"
 
@@ -28,7 +27,7 @@ func benchHelper(b *testing.B, loader string, file string, f func(file string) (
 	}
 	var ms vips.MemoryStats
 	vips.ReadVipsMemStats(&ms)
-	fmt.Printf("[%s] Mem: %d, MemHigh: %d, Files: %d, Allocs: %d\n", loader, ms.Mem, ms.MemHigh, ms.Files, ms.Allocs)
+	b.Logf("[%s] Mem: %d, MemHigh: %d, Files: %d, Allocs: %d\n", loader, ms.Mem, ms.MemHigh, ms.Files, ms.Allocs)
 }
 
 var testFile = resources + "jpg-24bit.jpg"

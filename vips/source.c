@@ -1,32 +1,21 @@
 #include "source.h"
 
-GoSourceArguments * create_go_source_arguments( char * owner_object_id )
+VipsSourceCustom * create_go_custom_source()
 {
-	GoSourceArguments * source_args;
-	source_args = malloc(sizeof(GoSourceArguments));
-	source_args->owner_object_id = owner_object_id;
-
-	return source_args;
+	return vips_source_custom_new();
 }
 
-VipsSourceCustom * create_go_custom_source( GoSourceArguments * source_args )
+gulong connect_go_signal_read(VipsSourceCustom *source_custom, gpointer go_source)
 {
-	VipsSourceCustom * source_custom = vips_source_custom_new();
-
-	return source_custom;
+	return g_signal_connect( source_custom, "read", G_CALLBACK(go_read), (gpointer) go_source );
 }
 
-gulong connect_go_signal_read(VipsSourceCustom *source_custom, GoSourceArguments * source_args)
+gulong connect_go_signal_seek(VipsSourceCustom *source_custom, gpointer go_source)
 {
-	return g_signal_connect( source_custom, "read", G_CALLBACK(go_read), source_args );
+	return g_signal_connect( source_custom, "seek", G_CALLBACK(go_seek), go_source );
 }
 
-gulong connect_go_signal_seek(VipsSourceCustom *source_custom, GoSourceArguments * source_args)
-{
-	return g_signal_connect( source_custom, "seek", G_CALLBACK(go_seek), source_args );
-}
-
-void free_go_custom_source(VipsSourceCustom *source_custom, GoSourceArguments * source_args, gulong rsig_handler_id, gulong ssig_handler_id)
+void free_go_custom_source(VipsSourceCustom *source_custom, gulong rsig_handler_id, gulong ssig_handler_id)
 {
 	if (source_custom != NULL) {
 		g_signal_handler_disconnect(source_custom, rsig_handler_id);
@@ -34,22 +23,14 @@ void free_go_custom_source(VipsSourceCustom *source_custom, GoSourceArguments * 
 
 		g_object_unref(source_custom);
 	}
-
-	if (source_args != NULL) {
-		if (source_args->owner_object_id != NULL) {
-			free(source_args->owner_object_id);
-		}
-
-		free(source_args);
-	}
 }
 
-static gint64 go_read ( VipsSourceCustom *source_custom, void *buffer, gint64 length, GoSourceArguments * source_args )
+static gint64 go_read ( VipsSourceCustom *source_custom, void *buffer, gint64 length, gpointer go_source )
 {
-    return goSourceRead(source_args->owner_object_id, buffer, length);
+    return goSourceRead(go_source, buffer, length);
 }
 
-static gint64 go_seek ( VipsSourceCustom *source_custom, gint64 offset, int whence, GoSourceArguments * source_args )
+static gint64 go_seek ( VipsSourceCustom *source_custom, gint64 offset, int whence, gpointer go_source )
 {
-	return goSourceSeek(source_args->owner_object_id, offset, whence);
+	return goSourceSeek(go_source, offset, whence);
 }

@@ -10,6 +10,19 @@ import (
 	"unsafe"
 )
 
+type LoadImageError struct {
+	Format ImageType
+	Err    error
+}
+
+func (e *LoadImageError) Error() string {
+	msg := "Unknown error"
+	if e.Err != nil {
+		msg = e.Err.Error()
+	}
+	return fmt.Sprintf("error loading image with type '%s' from source: %s", e.Format.FileExt(), msg)
+}
+
 var (
 	// ErrUnsupportedImageFormat when image type is unsupported
 	ErrUnsupportedImageFormat = errors.New("unsupported image format")
@@ -36,4 +49,11 @@ func handleVipsError() error {
 	C.vips_error_clear()
 
 	return fmt.Errorf("%v\nStack:\n%s", s, dbg.Stack())
+}
+
+func newLoadImageError(err error, format ImageType) *LoadImageError {
+	return &LoadImageError{
+		Format: format,
+		Err:    err,
+	}
 }

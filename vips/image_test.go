@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -462,6 +463,36 @@ func TestImageRef_TransformICCProfile(t *testing.T) {
 
 	assert.True(t, image.HasIPTC())
 	assert.True(t, image.HasICCProfile())
+}
+
+func TestImageRef_Close(t *testing.T) {
+	Startup(&Config{
+		ReportLeaks: true,
+	})
+	image, err := NewImageFromFile(resources + "png-24bit.png")
+	assert.NoError(t, err)
+
+	image.Close()
+	assert.Nil(t, image.image)
+}
+
+func TestImageRef_Close__AlreadyClosed(t *testing.T) {
+	Startup(&Config{
+		ReportLeaks: true,
+	})
+
+	image, err := NewImageFromFile(resources + "png-24bit.png")
+	assert.NoError(t, err)
+
+	go image.Close()
+	go image.Close()
+	go image.Close()
+	go image.Close()
+	defer image.Close()
+	image.Close()
+
+	assert.Nil(t, image.image)
+	runtime.GC()
 }
 
 func TestImageRef_NotImage(t *testing.T) {

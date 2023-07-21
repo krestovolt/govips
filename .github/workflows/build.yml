@@ -24,6 +24,7 @@ jobs:
       - name: Install linux deps
         if: matrix.os == 'ubuntu-22.04'
         run: |
+          sudo apt-get update
           sudo apt-get -y install libopenjp2-7
           sudo apt-get -y install libvips-dev
 
@@ -40,7 +41,12 @@ jobs:
         run: go build -v ./vips
 
       - name: Test
-        run: go test -v -coverprofile=profile.cov ./...
+        run: |
+          go test -v -coverprofile=init.cov -run '^TestInitConfig$' ./...
+          SKIP_TEST_INIT=1 go test -v -coverprofile=all.cov ./...
+          echo 'mode: set' > ./profile.cov
+          cat ./all.cov | tail -n +2 >> ./profile.cov
+          cat ./init.cov | tail -n +2 >> ./profile.cov
 
       - name: Coveralls
         if: matrix.os == 'ubuntu-22.04'

@@ -14,6 +14,10 @@ void set_int_param(Param *p, gint i) {
   p->is_set = TRUE;
 }
 
+void set_access_mode(VipsAccess *p, VipsAccess m) {
+  (*p) = m;
+}
+
 void set_double_param(Param *p, gdouble d) {
   p->type = PARAM_TYPE_DOUBLE;
   p->value.d = d;
@@ -248,7 +252,11 @@ int load_source(const char *operationName, VipsSourceCustom *src,
   if (vips_object_set(VIPS_OBJECT(operation), "source", src, NULL)) {
     return 1;
   }
-
+  
+  if (vips_object_set(VIPS_OBJECT(operation), "access", params->access, NULL)) {
+    return 1;
+  }
+  
   if (setLoadOptions(operation, params)) {
     vips_object_unref_outputs(VIPS_OBJECT(operation));
     g_object_unref(operation);
@@ -609,6 +617,7 @@ int save_to_target(SaveParams *params, VipsTargetCustom *target) {
 LoadParams create_load_params(ImageType inputFormat) {
   Param defaultParam = {};
   LoadParams p = {
+      .access = VIPS_ACCESS_RANDOM,
       .inputFormat = inputFormat,
       .inputBlob = NULL,
       .outputImage = NULL,

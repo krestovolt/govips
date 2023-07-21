@@ -51,9 +51,11 @@ typedef struct Param {
 void set_bool_param(Param *p, gboolean b);
 void set_int_param(Param *p, gint i);
 void set_double_param(Param *p, gdouble d);
+void set_access_mode(VipsAccess *p, VipsAccess m);
 
 typedef struct LoadParams {
   ImageType inputFormat;
+  VipsAccess access;
   VipsBlob *inputBlob;
   VipsImage *outputImage;
 

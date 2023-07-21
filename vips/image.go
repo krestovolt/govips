@@ -110,6 +110,8 @@ type ImportParams struct {
 	JpegShrinkFactor IntParameter
 	HeifThumbnail    BoolParameter
 	SvgUnlimited     BoolParameter
+
+	AccessMode IntParameter
 }
 
 // NewImportParams creates default ImportParams
@@ -122,6 +124,9 @@ func NewImportParams() *ImportParams {
 // OptionString convert import params to option_string
 func (i *ImportParams) OptionString() string {
 	var values []string
+	if v := i.AccessMode; v.IsSet() {
+		values = append(values, "access="+strconv.Itoa(v.Get()))
+	}
 	if v := i.NumPages; v.IsSet() {
 		values = append(values, "n="+strconv.Itoa(v.Get()))
 	}

@@ -16,6 +16,27 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
+// AccessMode correlates to a libvips access mode
+//
+// https://www.libvips.org/API/current/VipsImage.html#VipsAccess
+type AccessMode int
+
+func (m AccessMode) Int() int {
+	return int(m)
+}
+
+// AccessMode enum correlating to libvips access mode
+const (
+	// can read anywhere, this is the default mode.
+	VipsAccessRandom AccessMode = C.VIPS_ACCESS_RANDOM
+
+	// read the whole image exactly once, top-to-bottom reading only, but with a small buffer. The source treated as one-way stream/
+	VipsAccessSequential AccessMode = C.VIPS_ACCESS_SEQUENTIAL
+
+	VipsAccessSequentialUnbuffered AccessMode = C.VIPS_ACCESS_SEQUENTIAL_UNBUFFERED
+	VipsAccessLast                 AccessMode = C.VIPS_ACCESS_LAST
+)
+
 // SubsampleMode correlates to a libvips subsample mode
 type SubsampleMode int
 
@@ -349,9 +370,16 @@ func maybeSetIntParam(p IntParameter, cp *C.Param) {
 	}
 }
 
+func maybeSetVipAccess(p IntParameter, cp *C.VipsAccess) {
+	if p.IsSet() {
+		C.set_access_mode(cp, C.VipsAccess(p.Get()))
+	}
+}
+
 func createImportParams(format ImageType, params *ImportParams) C.LoadParams {
 	p := C.create_load_params(C.ImageType(format))
 
+	maybeSetVipAccess(params.AccessMode, &p.access)
 	maybeSetBoolParam(params.AutoRotate, &p.autorotate)
 	maybeSetBoolParam(params.FailOnError, &p.fail)
 	maybeSetIntParam(params.Page, &p.page)

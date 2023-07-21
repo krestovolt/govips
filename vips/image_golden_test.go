@@ -973,22 +973,25 @@ func goldenTest(
 	defer file.Close()
 
 	img2, err := NewImageFromReader(file)
-	require.NoError(t, err)
+	if img.OriginalFormat() == ImageTypeBMP {
+		assert.Error(t, err)
+	} else {
+		require.NoError(t, err)
+		err = exec(img2)
 
-	err = exec(img2)
+		require.NoError(t, err)
 
-	require.NoError(t, err)
+		buf2, metadata2, err := export(img2)
 
-	buf2, metadata2, err := export(img2)
+		require.NoError(t, err)
 
-	require.NoError(t, err)
+		result2, err := NewImageFromBuffer(buf2)
+		require.NoError(t, err)
 
-	result2, err := NewImageFromBuffer(buf2)
-	require.NoError(t, err)
+		validate(result2)
 
-	validate(result2)
-
-	assertGoldenMatch(t, path, buf2, metadata2.Format)
+		assertGoldenMatch(t, path, buf2, metadata2.Format)
+	}
 
 	return buf
 }

@@ -157,6 +157,10 @@ func IsTypeSupported(imageType ImageType) bool {
 func DetermineImageTypeFromSource(source *Source) ImageType {
 	length := 20
 	data := C.source_sniff(source.vipsSrc, C.ulong(length))
+	if data == nil {
+		return ImageTypeUnknown
+	}
+
 	sh := &reflect.SliceHeader{
 		Data: uintptr(data),
 		Len:  length,

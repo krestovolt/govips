@@ -181,6 +181,7 @@ func finalizeTarget(ref *Target) {
 func clearTarget(ref *C.VipsTargetCustom) {
 	C.clear_target(&ref)
 }
+
 func clearSource(ref *C.VipsSourceCustom) {
 	C.clear_source(&ref)
 }

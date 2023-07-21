@@ -2,28 +2,6 @@
 
 #include "lang.h"
 
-void set_bool_param(Param *p, gboolean b) {
-  p->type = PARAM_TYPE_BOOL;
-  p->value.b = b;
-  p->is_set = TRUE;
-}
-
-void set_int_param(Param *p, gint i) {
-  p->type = PARAM_TYPE_INT;
-  p->value.i = i;
-  p->is_set = TRUE;
-}
-
-void set_access_mode(VipsAccess *p, VipsAccess m) {
-  (*p) = m;
-}
-
-void set_double_param(Param *p, gdouble d) {
-  p->type = PARAM_TYPE_DOUBLE;
-  p->value.d = d;
-  p->is_set = TRUE;
-}
-
 void * source_sniff(VipsSourceCustom * source, size_t len) {
   return vips_source_sniff((VipsSource *) source, len);
 }
@@ -89,17 +67,17 @@ int load_image_buffer(LoadParams *params, void *buf, size_t len,
 
 #define MAYBE_SET_BOOL(OP, PARAM, NAME)                          \
   if (PARAM.is_set) {                                            \
-    vips_object_set(VIPS_OBJECT(OP), NAME, PARAM.value.b, NULL); \
+    vips_object_set(VIPS_OBJECT(OP), NAME, PARAM.b, NULL); \
   }
 
 #define MAYBE_SET_INT(OP, PARAM, NAME)                           \
   if (PARAM.is_set) {                                            \
-    vips_object_set(VIPS_OBJECT(OP), NAME, PARAM.value.i, NULL); \
+    vips_object_set(VIPS_OBJECT(OP), NAME, PARAM.i, NULL); \
   }
 
 #define MAYBE_SET_DOUBLE(OP, PARAM, NAME)                        \
   if (PARAM.is_set) {                                            \
-    vips_object_set(VIPS_OBJECT(OP), NAME, PARAM.value.d, NULL); \
+    vips_object_set(VIPS_OBJECT(OP), NAME, PARAM.d, NULL); \
   }
 
 typedef int (*SetLoadOptionsFn)(VipsOperation *operation, LoadParams *params);
@@ -614,76 +592,3 @@ int save_to_target(SaveParams *params, VipsTargetCustom *target) {
   return 1;
 }
 
-LoadParams create_load_params(ImageType inputFormat) {
-  Param defaultParam = {};
-  LoadParams p = {
-      .access = VIPS_ACCESS_RANDOM,
-      .inputFormat = inputFormat,
-      .inputBlob = NULL,
-      .outputImage = NULL,
-      .autorotate = defaultParam,
-      .fail = defaultParam,
-      .page = defaultParam,
-      .n = defaultParam,
-      .dpi = defaultParam,
-      .jpegShrink = defaultParam,
-      .heifThumbnail = defaultParam,
-      .svgUnlimited = defaultParam,
-  };
-  return p;
-}
-
-// TODO: Change to same pattern as ImportParams
-
-static SaveParams defaultSaveParams = {
-    .inputImage = NULL,
-    .outputBuffer = NULL,
-    .outputFormat = JPEG,
-    .outputLen = 0,
-
-    .interlace = FALSE,
-    .quality = 0,
-    .stripMetadata = FALSE,
-
-    .jpegOptimizeCoding = FALSE,
-    .jpegSubsample = VIPS_FOREIGN_JPEG_SUBSAMPLE_ON,
-    .jpegTrellisQuant = FALSE,
-    .jpegOvershootDeringing = FALSE,
-    .jpegOptimizeScans = FALSE,
-    .jpegQuantTable = 0,
-
-    .pngCompression = 6,
-    .pngPalette = FALSE,
-    .pngBitdepth = 0,
-    .pngDither = 0,
-    .pngFilter = VIPS_FOREIGN_PNG_FILTER_NONE,
-
-    .gifDither = 0.0,
-    .gifEffort = 0,
-    .gifBitdepth = 0,
-
-    .webpLossless = FALSE,
-    .webpNearLossless = FALSE,
-    .webpReductionEffort = 4,
-    .webpIccProfile = NULL,
-
-    .heifBitdepth = 8,
-    .heifLossless = FALSE,
-    .heifEffort = 5,
-
-    .tiffCompression = VIPS_FOREIGN_TIFF_COMPRESSION_LZW,
-    .tiffPredictor = VIPS_FOREIGN_TIFF_PREDICTOR_HORIZONTAL,
-    .tiffPyramid = FALSE,
-    .tiffTile = FALSE,
-    .tiffTileHeight = 256,
-    .tiffTileWidth = 256,
-
-    .jp2kLossless = FALSE,
-    .jp2kTileHeight = 512,
-    .jp2kTileWidth = 512};
-
-SaveParams create_save_params(ImageType outputFormat) {
-  SaveParams params = defaultSaveParams;
-  params.outputFormat = outputFormat;
-  return params;
-}

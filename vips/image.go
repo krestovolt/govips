@@ -424,7 +424,7 @@ func LoadImageFromBuffer(buf []byte, params *ImportParams) (*ImageRef, error) {
 		params = NewImportParams()
 	}
 
-	vipsImage, currentFormat, originalFormat, err := vipsLoadFromBuffer(buf, params)
+	vipsImage, currentFormat, originalFormat, err := vipsLoadFromBuffer(buf, *params)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +505,7 @@ func LoadImageFromSource(source *Source, params *ImportParams) (*ImageRef, error
 		params = NewImportParams()
 	}
 
-	vipsImage, currentFormat, originalFormat, err := vipsLoadFromSource(source, params)
+	vipsImage, currentFormat, originalFormat, err := vipsLoadFromSource(source, *params)
 
 	if err != nil {
 		return nil, err

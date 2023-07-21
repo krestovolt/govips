@@ -9,7 +9,7 @@ type RuntimeStats struct {
 
 var (
 	operationCounter chan string
-	runtimeStats     *RuntimeStats
+	runtimeStats     RuntimeStats
 	statLock         sync.RWMutex
 )
 
@@ -50,7 +50,7 @@ func ReadRuntimeStats(stats *RuntimeStats) {
 }
 
 func init() {
-	runtimeStats = &RuntimeStats{
+	runtimeStats = RuntimeStats{
 		OperationCounts: make(map[string]int64),
 	}
 }

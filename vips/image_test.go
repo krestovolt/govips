@@ -636,6 +636,20 @@ func TestImageRef_Maplut(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func BenchmarkImageRef_Maplut(b *testing.B) {
+	Startup(nil)
+
+	for i := 0; i < b.N; i += 1 {
+		image, _ := NewImageFromFile(resources + "png-24bit.png")
+
+		lut, _ := XYZ(1, 1)
+
+		_ = image.ExtractBand(0, 2)
+
+		_ = image.Maplut(lut)
+	}
+}
+
 func TestImageRef_Maplut_Error(t *testing.T) {
 	Startup(nil)
 

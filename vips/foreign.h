@@ -38,20 +38,13 @@ typedef enum ParamType {
 typedef struct Param {
   ParamType type;
 
-  union Value {
-    gboolean b;
-    gint i;
-    gdouble d;
-  } value;
+  gboolean b;
+  gint i;
+  gdouble d;
 
   gboolean is_set;
 
 } Param;
-
-void set_bool_param(Param *p, gboolean b);
-void set_int_param(Param *p, gint i);
-void set_double_param(Param *p, gdouble d);
-void set_access_mode(VipsAccess *p, VipsAccess m);
 
 typedef struct LoadParams {
   ImageType inputFormat;
@@ -70,7 +63,6 @@ typedef struct LoadParams {
 
 } LoadParams;
 
-LoadParams create_load_params(ImageType inputFormat);
 int load_from_buffer(LoadParams *params, void *buf, size_t len);
 int load_from_source(LoadParams *params, VipsSourceCustom *source);
 
@@ -131,7 +123,6 @@ typedef struct SaveParams {
   int	jp2kTileHeight;
 } SaveParams;
 
-SaveParams create_save_params(ImageType outputFormat);
 int save_to_buffer(SaveParams *params);
 int save_to_target(SaveParams *params, VipsTargetCustom *target);
 

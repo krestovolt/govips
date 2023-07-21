@@ -2,7 +2,9 @@
 package vips
 
 // #cgo pkg-config: vips
+// #cgo CFLAGS: -O3
 // #include <vips/vips.h>
+// #include <vips/vector.h>
 // #include "govips.h"
 import "C"
 import (
@@ -15,8 +17,8 @@ import (
 
 const (
 	defaultConcurrencyLevel = 1
-	defaultMaxCacheMem      = 50 * 1024 * 1024
-	defaultMaxCacheSize     = 100
+	defaultMaxCacheMem      = 0
+	defaultMaxCacheSize     = 0
 	defaultMaxCacheFiles    = 0
 )
 
@@ -47,11 +49,13 @@ var (
 type Config struct {
 	ConcurrencyLevel int
 	MaxCacheFiles    int
-	MaxCacheMem      int
-	MaxCacheSize     int
-	ReportLeaks      bool
-	CacheTrace       bool
-	CollectStats     bool
+	// Enabled cache can cause SIGSEGV on Musl-based systems like Alpine.
+	MaxCacheMem int
+	// Enabled cache can cause SIGSEGV on Musl-based systems like Alpine.
+	MaxCacheSize int
+	ReportLeaks  bool
+	CacheTrace   bool
+	CollectStats bool
 }
 
 // Startup sets up the libvips support and ensures the versions are correct. Pass in nil for
@@ -99,6 +103,8 @@ func Startup(config *Config) {
 	initializeICCProfiles()
 
 	running = true
+
+	C.vips_vector_set_enabled(1)
 
 	if config != nil {
 		if config.CollectStats {
